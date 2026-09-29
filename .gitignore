@@ -1,0 +1,18 @@
+node_modules/
+dist/
+.vite/
+coverage/
+*.log
+.DS_Store
+Thumbs.db
+
+# Interne Arbeitsunterlagen bleiben lokal.
+BACKLOG.md
+DECISIONS.md
+EXPANSION_PLAN.md
+RELEASE_CHECKLIST.md
+STATUS.md
+TEST_LINKS.md
+Festival_Panic_Game_Design_Document.docx
+docs/
+scripts/
