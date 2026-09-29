@@ -2,6 +2,8 @@
 
 Festival Panic ist ein humorvolles Top-down-Pixel-RPG für den Browser.
 
+**[Jetzt im Browser spielen](https://frankko808.github.io/festivalpanic/)**
+
 ## Aktueller Vertical Slice
 
 Der aktuelle Vertical Slice enthält:
