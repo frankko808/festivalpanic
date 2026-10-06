@@ -50,7 +50,7 @@ export class CouncilChamberScene extends Phaser.Scene {
     this.rudi = gameState.current.flags.rudiFirstMeetingComplete
       ? this.add.image(430, 470, "rudi").setOrigin(0.5, 0.8).setDepth(570)
       : undefined;
-    this.interactions = new InteractionSystem();
+    this.interactions = new InteractionSystem(this);
     this.registerTable();
     this.registerExit();
     this.registerRudi();
@@ -67,6 +67,7 @@ export class CouncilChamberScene extends Phaser.Scene {
 
   update(): void {
     this.updateRudi();
+    if (this.journal.isOpen || this.dialog.isOpen || this.unlock.isOpen) this.interactions.clear();
     if (this.journal.isOpen) {
       this.player.updateMovement(false);
       this.hud.setPrompt("");
@@ -82,6 +83,8 @@ export class CouncilChamberScene extends Phaser.Scene {
     if (!this.dialog.isOpen && !this.unlock.isOpen && Phaser.Input.Keyboard.JustDown(this.menuKey)) {
       this.player.updateMovement(false);
       this.journal.open("insights");
+      this.interactions.clear();
+      this.hud.setPrompt("");
       return;
     }
     if (this.unlock.isOpen) {
@@ -159,6 +162,7 @@ export class CouncilChamberScene extends Phaser.Scene {
   }
 
   private createRoomColliders(): void {
+    this.addCollider(480, 46, 960, 92);
     this.addCollider(480, 180, 610, 98);
     for (let index = 0; index < 12; index += 1) {
       const x = 205 + (index % 6) * 110;
@@ -213,7 +217,7 @@ export class CouncilChamberScene extends Phaser.Scene {
 
   private registerExit(): void {
     const exit = this.add.zone(480, 516, 130, 50);
-    this.interactions.register({ id: "council-exit", displayName: "das Treppenhaus", object: exit, range: 76, enabled: () => true, interact: () => this.scene.start("TownHallScene", { spawn: { x: 735, y: 365 } }), prompt: () => "Ins Erdgeschoss zurück", priority: 5 });
+    this.interactions.register({ id: "council-exit", displayName: "das Treppenhaus", object: exit, range: 76, enabled: () => true, interact: () => this.scene.start("TownHallScene", { spawn: { x: 825, y: 248 } }), prompt: () => "Ins Erdgeschoss zurück", priority: 5 });
   }
 
   private registerRudi(): void {

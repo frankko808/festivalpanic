@@ -36,7 +36,7 @@ Der aktuelle Vertical Slice enthält:
 - zusätzliche Stadt-NPCs, Stadtbrunnen, Wegportale und bewachter Zugang zum Abstimmungssaal
 - vollständig illustriertes Pixelstadt-Titelbild mit echten Häuserfassaden, Rathaus und Marktplatz
 - optionale Nebenmissionen: Picknickkorb, vermisste Katze und drei Glücksmünzen
-- spielbares Drei-Akkorde-Rhythmus-Minispiel am Kulturkai
+- spielbares Drei-Akkorde-Rhythmus-Minispiel am Kulturkai mit höchstens drei Teilnahmen pro Durchgang (auch abgebrochene Runden zählen; der Zähler wird gespeichert)
 - vorbereiteter, betretbarer Abstimmungssaal nach vier gesammelten Argumenten
 - laufende Highscore-Aktualisierung in `localStorage`
 - vollständige Drei-Verhandlungen-Phase mit vier Argumentkarten und allen 16 Gruppenkombinationen

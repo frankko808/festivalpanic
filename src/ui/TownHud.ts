@@ -2,6 +2,7 @@ import Phaser from "phaser";
 import { gameState } from "../state/GameState";
 import { formatDuration } from "../utils/formatDuration";
 import { audioManager } from "../systems/AudioManager";
+import { getHudObjective } from "./hudObjective";
 
 export class TownHud {
   private readonly prompt: Phaser.GameObjects.Text;
@@ -11,7 +12,7 @@ export class TownHud {
   private readonly stats: Phaser.GameObjects.Text;
   private turboUnlocked = false;
 
-  constructor(scene: Phaser.Scene) {
+  constructor(private readonly scene: Phaser.Scene) {
     this.status = scene.add
       .text(18, 16, "", {
         fontFamily: "Trebuchet MS",
@@ -46,7 +47,7 @@ export class TownHud {
       })
       .setScrollFactor(0)
       .setDepth(900)
-      .setVisible(false);
+      .setVisible(true);
     this.prompt = scene.add
       .text(480, 510, "", {
         fontFamily: "Trebuchet MS",
@@ -77,7 +78,12 @@ export class TownHud {
   }
 
   setStatus(text: string): void {
-    if (this.status.text !== text) this.status.setText(text);
+    const locations: Record<string, string> = {
+      TownScene: "MARKTPLATZ", ParkScene: "STADTPARK", KaiScene: "KULTURKAI",
+      TownHallScene: "RATHAUS · FOYER", CouncilChamberScene: "RATSSAAL", FestivalScene: "SOMMERFEST",
+    };
+    const location = locations[this.scene.scene.key] ?? text.split("  •  ")[0]!;
+    if (this.status.text !== location) this.status.setText(location);
   }
 
   setHelpVisible(visible: boolean): void {
@@ -89,19 +95,24 @@ export class TownHud {
     this.refreshHelp();
   }
 
-  setQuest(text: string): void {
-    if (this.quest.text !== text) this.quest.setText(text);
-    if (this.quest.visible !== Boolean(text)) this.quest.setVisible(Boolean(text));
+  setQuest(_text: string): void {
+    this.refreshObjective();
   }
 
   private refreshStats(): void {
     this.refreshHelp();
     const text = `PUNKTE ${gameState.current.score}  •  ZEIT ${formatDuration(gameState.current.elapsedMs)}`;
     if (this.stats.text !== text) this.stats.setText(text);
+    this.refreshObjective();
+  }
+
+  private refreshObjective(): void {
+    const text = getHudObjective(gameState.current, this.scene.scene.key);
+    if (this.quest.text !== text) this.quest.setText(text);
   }
 
   private refreshHelp(): void {
-    const text = `Pfeile/WASD • ${this.turboUnlocked ? "Q: Turbo • " : ""}E: Aktion • M: Menü • V: Ton ${audioManager.isMuted ? "aus" : "an"}`;
+    const text = `E: Aktion · M: Journal · V: Ton ${audioManager.isMuted ? "aus" : "an"}${this.turboUnlocked ? " · Q: Turbo" : ""}`;
     if (this.help.text !== text) this.help.setText(text);
   }
 }

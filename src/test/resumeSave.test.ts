@@ -71,6 +71,34 @@ describe("Fortsetzen-Spielstand", () => {
     expect(gameState.resumeSavedRun()).toMatchObject({ scene: "ShopInteriorScene", shopId: "cafe", returnSpawn: { x: 610, y: 920 } });
   });
 
+  it("speichert Linas Teilnahmen sofort und behält die Grenze nach dem Laden", () => {
+    gameState.completeRudiMeeting();
+    gameState.captureResumePoint({ scene: "KaiScene", x: 930, y: 540 });
+    for (let round = 1; round <= 3; round += 1) {
+      expect(gameState.startLinaRhythmRound()).toBe(true);
+      expect(loadRunSave()?.run.sideQuests.linaRoundsPlayed).toBe(round);
+      gameState.resetRun(true);
+      gameState.resumeSavedRun();
+      expect(gameState.linaRoundsRemaining).toBe(3 - round);
+    }
+    expect(gameState.startLinaRhythmRound()).toBe(false);
+  });
+
+  it("lädt ältere Spielstände ohne Lina-Zähler mit drei verfügbaren Runden", async () => {
+    gameState.completeRudiMeeting();
+    gameState.captureResumePoint({ scene: "KaiScene", x: 930, y: 540 });
+    gameState.flushRunSave();
+    const saved = JSON.parse(values.get("festival-panic-run-v1")!);
+    delete saved.run.sideQuests.linaRoundsPlayed;
+    values.set("festival-panic-run-v1", JSON.stringify(saved));
+    // A new module instance mirrors a browser reload of the old save.
+    vi.resetModules();
+    const { gameState: restored } = await import("../state/GameState");
+    expect(restored.resumeSavedRun()).toMatchObject({ scene: "KaiScene" });
+    expect(restored.linaRoundsRemaining).toBe(3);
+    expect(restored.startLinaRhythmRound()).toBe(true);
+  });
+
   it("kehrt nach einer unterbrochenen Abstimmung mit Beschluss zum Festival zurück", () => {
     gameState.completeRudiMeeting();
     gameState.captureResumePoint({ scene: "CouncilChamberScene", x: 480, y: 468 });

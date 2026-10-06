@@ -2,6 +2,7 @@ import Phaser from "phaser";
 import { gameState } from "../state/GameState";
 import { setDepthIfChanged } from "../utils/setDepthIfChanged";
 import { TurboAxisCooldown } from "../systems/TurboAxisCooldown";
+import { createPlayerTexture } from "../utils/createPlaceholderTextures";
 
 export class Player extends Phaser.Physics.Arcade.Sprite {
   private readonly cursors: Phaser.Types.Input.Keyboard.CursorKeys;
@@ -18,6 +19,8 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   private nextTurboTrailAt = 0;
 
   constructor(scene: Phaser.Scene, x: number, y: number, texture: string) {
+    // Every map can be the first scene after loading a saved run.
+    if (texture === "player") createPlayerTexture(scene, gameState.current.appearance);
     super(scene, x, y, texture);
     scene.add.existing(this);
     scene.physics.add.existing(this);

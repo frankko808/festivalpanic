@@ -24,13 +24,14 @@ import { InteractionSystem } from "../systems/InteractionSystem";
 import { gameState } from "../state/GameState";
 import { DialogBox } from "../ui/DialogBox";
 import { TownHud } from "../ui/TownHud";
-import { createPlayerTexture } from "../utils/createPlaceholderTextures";
 import { createWorldDepthLayer } from "../utils/createWorldDepthLayer";
 import { setDepthIfChanged } from "../utils/setDepthIfChanged";
 import { ACHIEVEMENTS } from "../data/achievements";
 import { createFestivalOutroMoments } from "../data/festivalOutroMoments";
 import { formatDuration } from "../utils/formatDuration";
 import { FestivalOutro } from "../ui/FestivalOutro";
+import { FestivalEndConfirmation } from "../ui/FestivalEndConfirmation";
+import { JournalMenu } from "../ui/JournalMenu";
 import type { FestivalGameKind } from "./FestivalGameScene";
 
 const WORLD_WIDTH = 1600;
@@ -76,6 +77,12 @@ export class FestivalScene extends Phaser.Scene {
   private hud!: TownHud;
   private dialog!: DialogBox;
   private interactions!: InteractionSystem;
+  private endConfirmation!: FestivalEndConfirmation;
+  private journal!: JournalMenu;
+  private menuKey!: Phaser.Input.Keyboard.Key;
+  private escapeKey!: Phaser.Input.Keyboard.Key;
+  private upKey!: Phaser.Input.Keyboard.Key;
+  private downKey!: Phaser.Input.Keyboard.Key;
   private interactKey!: Phaser.Input.Keyboard.Key;
   private spaceKey!: Phaser.Input.Keyboard.Key;
   private enterKey!: Phaser.Input.Keyboard.Key;
@@ -116,7 +123,6 @@ export class FestivalScene extends Phaser.Scene {
     this.physics.world.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
     this.cameras.main.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
     this.drawFestivalMarket();
-    createPlayerTexture(this, gameState.current.appearance);
     const previewArea = import.meta.env.DEV ? new URLSearchParams(window.location.search).get("area") : null;
     const previewSpawn = previewArea === "main-stage"
       ? { x: 530, y: 430 }
@@ -141,8 +147,10 @@ export class FestivalScene extends Phaser.Scene {
     this.hud.setQuest("Genieße das Festival und sprich mit den Gästen.\nSprich mit der Bürgermeisterin und geh dann zum leuchtenden Stern." +
       (earned.length ? `\nNEUE ERFOLGE: ${earned.join(" · ")}` : ""));
     this.dialog = new DialogBox(this);
-    this.interactions = new InteractionSystem();
+    this.interactions = new InteractionSystem(this);
     this.configureKeys();
+    this.endConfirmation = new FestivalEndConfirmation(this);
+    this.journal = new JournalMenu(this);
     this.registerInteractions();
 
     this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
@@ -152,6 +160,25 @@ export class FestivalScene extends Phaser.Scene {
 
   update(): void {
     this.updateRudi();
+    if (this.dialog.isOpen || this.outro || this.resultsVisible || this.endConfirmation.isOpen || this.journal.isOpen) this.interactions.clear();
+    if (this.endConfirmation.isOpen) {
+      this.player.updateMovement(false);
+      this.hud.setPrompt("");
+      this.endConfirmation.update();
+      return;
+    }
+    if (this.journal.isOpen) {
+      this.player.updateMovement(false);
+      this.hud.setPrompt("");
+      if (Phaser.Input.Keyboard.JustDown(this.menuKey) || Phaser.Input.Keyboard.JustDown(this.escapeKey)) this.journal.close();
+      else if (Phaser.Input.Keyboard.JustDown(this.upKey)) this.journal.turnPage(-1);
+      else if (Phaser.Input.Keyboard.JustDown(this.downKey)) this.journal.turnPage(1);
+      else {
+        const tab = this.choiceKeys.findIndex((key) => Phaser.Input.Keyboard.JustDown(key));
+        if (tab >= 0) this.journal.select(tab);
+      }
+      return;
+    }
     if (this.resultsVisible) {
       this.player.updateMovement(false);
       if (this.time.now >= this.resultsReadyAt && Phaser.Input.Keyboard.JustDown(this.enterKey)) {
@@ -175,6 +202,13 @@ export class FestivalScene extends Phaser.Scene {
       if (this.consumeAction()) this.dialog.advance();
       return;
     }
+    if (Phaser.Input.Keyboard.JustDown(this.menuKey)) {
+      this.journal.open("quests");
+      this.player.updateMovement(false);
+      this.interactions.clear();
+      this.hud.setPrompt("");
+      return;
+    }
     this.player.updateMovement(true);
     this.hud.setPrompt(this.interactions.update(this.player));
     if (this.consumeAction()) this.interactions.interact();
@@ -186,6 +220,10 @@ export class FestivalScene extends Phaser.Scene {
     this.interactKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.E);
     this.spaceKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
     this.enterKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ENTER);
+    this.menuKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.M);
+    this.escapeKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
+    this.upKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.UP);
+    this.downKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.DOWN);
     this.choiceKeys = [1, 2, 3].map((number) => keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ONE + number - 1));
     this.actionArmed = true;
   }
@@ -417,12 +455,12 @@ export class FestivalScene extends Phaser.Scene {
       this.guestSprites.push({ id: guest.id, sprite, script: createFestivalGroupDialogue(guest.id, this.plan, supporters.has(guest.id), cost) });
     });
 
-    const mayor = this.add.image(800, 270, "mayor").setOrigin(0.5, 0.8).setDepth(370);
+    const mayor = this.add.image(1030, 315, "mayor").setOrigin(0.5, 0.8).setDepth(415);
     addNpcCollision(this, this.player, mayor);
     this.createNameLabel(mayor, "Bürgermeisterin", "✦");
     this.guestSprites.push({ id: "mayor", sprite: mayor, script: festivalMayorDialogue });
 
-    const samira = this.add.image(500, 675, "npc-red").setOrigin(0.5, 0.8).setDepth(775);
+    const samira = this.add.image(500, 635, "npc-red").setOrigin(0.5, 0.8).setDepth(735);
     addNpcCollision(this, this.player, samira);
     this.createNameLabel(samira, "Samira", "🍟");
     this.guestSprites.push({ id: "samira", sprite: samira, script: festivalAliDialogue });
@@ -533,20 +571,25 @@ export class FestivalScene extends Phaser.Scene {
       priority: 10,
       enabled: () => !this.finaleStarted && !this.resultsVisible,
       interact: () => {
-        this.finaleStarted = true;
-        const openFinale = (): void => this.dialog.open(festivalFinaleDialogue, () => this.showOutro());
-        if (gameState.current.flags.festivalMayorConversationComplete) openFinale();
-        else this.dialog.open(festivalMayorDialogue, () => {
-          gameState.completeFestivalMayorConversation();
-          openFinale();
-        });
+        this.hud.setPrompt("");
+        this.endConfirmation.show(() => this.startFinale());
       },
       prompt: () => "Festival abschließen und Auswertung ansehen",
     });
     this.finaleZone.on("pointerup", () => {
-      if (!this.dialog.isOpen && !this.outro && !this.resultsVisible) {
+      if (!this.dialog.isOpen && !this.outro && !this.resultsVisible && !this.endConfirmation.isOpen && !this.journal.isOpen) {
         this.interactions.interactWith("festival-finale", this.player);
       }
+    });
+  }
+
+  private startFinale(): void {
+    this.finaleStarted = true;
+    const openFinale = (): void => this.dialog.open(festivalFinaleDialogue, () => this.showOutro());
+    if (gameState.current.flags.festivalMayorConversationComplete) openFinale();
+    else this.dialog.open(festivalMayorDialogue, () => {
+      gameState.completeFestivalMayorConversation();
+      openFinale();
     });
   }
 

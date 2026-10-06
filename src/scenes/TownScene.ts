@@ -18,7 +18,6 @@ import { DialogBox } from "../ui/DialogBox";
 import { TownHud } from "../ui/TownHud";
 import { UnlockOverlay } from "../ui/UnlockOverlay";
 import { JournalMenu } from "../ui/JournalMenu";
-import { createPlayerTexture } from "../utils/createPlaceholderTextures";
 import { createWorldDepthLayer } from "../utils/createWorldDepthLayer";
 import { faceHorizontalMotion } from "../utils/motionFacing";
 import { setDepthIfChanged } from "../utils/setDepthIfChanged";
@@ -90,14 +89,14 @@ export class TownScene extends Phaser.Scene {
     this.createTownLandmarks();
     this.companionObstacleBounds.push(...this.staticObstacles.map((obstacle) => obstacle.getBounds()));
 
-    createPlayerTexture(this, gameState.current.appearance);
-    const spawn = data?.spawn ?? (data?.entrance === "west" ? { x: 70, y: 370 } : data?.entrance === "east" ? { x: 1450, y: 370 } : data?.entrance === "hall" ? { x: 740, y: 190 } : { x: 410, y: 470 });
+    const spawn = { ...(data?.spawn ?? (data?.entrance === "west" ? { x: 70, y: 370 } : data?.entrance === "east" ? { x: 1450, y: 370 } : data?.entrance === "hall" ? { x: 740, y: 190 } : { x: 410, y: 470 })) };
+    spawn.y = Math.min(spawn.y, WORLD_HEIGHT - 24);
     this.player = new Player(this, spawn.x, spawn.y, "player");
     this.physics.add.collider(this.player, this.staticObstacles);
     if (this.townCat?.visible) addNpcCollision(this, this.player, this.townCat, { width: 18, height: 10, bottomInset: 1 });
     this.createStoryCharacters();
     this.createGroupCharacters();
-    this.interactionSystem = new InteractionSystem();
+    this.interactionSystem = new InteractionSystem(this);
     this.createMapPortals();
     this.createQuestProps();
     createWorldDepthLayer(this, this.groundTexture ? [this.groundTexture] : []);
@@ -123,6 +122,7 @@ export class TownScene extends Phaser.Scene {
       this.mayorLabel.setPosition(this.mayor.x, this.mayor.y - 46).setVisible(mayorIsPresent);
     }
     this.updateRudiCompanion(delta);
+    if (this.journal.isOpen || this.dialogBox.isOpen || this.unlockOverlay.isOpen) this.interactionSystem.clear();
     if (this.journal.isOpen) {
       this.player.updateMovement(false);
       this.hud.setPrompt("");
@@ -138,6 +138,8 @@ export class TownScene extends Phaser.Scene {
     if (!this.dialogBox.isOpen && !this.unlockOverlay.isOpen && Phaser.Input.Keyboard.JustDown(this.menuKey)) {
       this.player.updateMovement(false);
       this.journal.open();
+      this.interactionSystem.clear();
+      this.hud.setPrompt("");
       return;
     }
     if (this.dialogBox.isOpen) {
@@ -313,7 +315,7 @@ export class TownScene extends Phaser.Scene {
       enabled: () => true,
       interact: () => this.scene.start("ShopInteriorScene", {
         shopId,
-        returnSpawn: { x, y: y + 78 },
+        returnSpawn: { x, y: Math.min(y + 78, WORLD_HEIGHT - 24) },
       }),
       prompt: () => prompt,
       priority: 5,
@@ -438,7 +440,7 @@ export class TownScene extends Phaser.Scene {
     });
     this.hud.setHelpVisible(true);
     this.hud.setStatus("RUDI GETROFFEN  •  Sprich mit der Bürgermeisterin");
-    this.mayor.enableBody(false, 480, 148, true, true);
+    this.mayor.enableBody(true, 480, 176, true, true);
     this.mayorAlert = this.add
       .text(this.mayor.x, this.mayor.y - 55, "!", {
         fontFamily: "Courier New",
@@ -453,7 +455,7 @@ export class TownScene extends Phaser.Scene {
     this.tweens.add({
       targets: [this.mayor, this.mayorAlert],
       x: "+=86",
-      y: "+=154",
+      y: "+=126",
       duration: 880,
       ease: "Sine.Out",
       onUpdate: () =>
@@ -579,7 +581,7 @@ export class TownScene extends Phaser.Scene {
     if (this.rudi.body) this.rudi.body.enable = false;
     this.rudiLabel.setText("Rudi ♥");
     if (!state.flags.mayorFirstMeetingComplete) {
-      this.mayor.enableBody(false, 566, 302, true, true);
+      this.mayor.enableBody(true, 566, 302, true, true);
       this.mayor.setDepth(402);
       this.mayorLabel.setPosition(566, 256).setVisible(true);
       this.mayorInteractionEnabled = true;

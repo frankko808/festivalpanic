@@ -119,9 +119,12 @@ export class JournalMenu {
   private questsText(): string {
     const state = gameState.current;
     const lines = ["HAUPTAUFGABE · RETTE DAS SOMMERFEST", ""];
-    if (!state.quest.mainQuestStarted) lines.push("○ Sprich mit Rudi und anschließend mit der Bürgermeisterin.");
+    if (state.phase === "festival") lines.push("✓ Das Sommerfest ist politisch gerettet.\n◉ Sprich mit den Gästen und der Bürgermeisterin.\n  Pommes-Rush, Dosenwerfen und Rudis Suche sind freiwillig.\n  Am leuchtenden Stern kannst du das Festival abschließen.");
+    else if (!state.quest.mainQuestStarted) lines.push("○ Sprich mit Rudi und anschließend mit der Bürgermeisterin.");
     else if (state.quest.groupsInterviewed < state.quest.groupsTotal) lines.push(`◉ Befrage die politischen Gruppen: ${state.quest.groupsInterviewed}/${state.quest.groupsTotal}\n  Markt: Brömmel · Kai: Mia · Park: Nora · Rathaus: Centner`);
-    else if (!state.flags.firstDraftSaved) lines.push("◉ Öffne das Planungspult und erstelle den ersten Entwurf.");
+    else if (!state.flags.groupSummaryComplete) lines.push("◉ Werte die Argumentkarten am Planungspult im Ratssaal aus.");
+    else if (!state.flags.firstDraftSaved) lines.push("◉ Öffne das Planungspult im Ratssaal und erstelle den ersten Entwurf.");
+    else if (!state.quest.negotiationStarted) lines.push("◉ Sprich mit Rudi, um die Verhandlungen zu beginnen.");
     else if (state.quest.negotiationTokensRemaining > 0) lines.push(`◉ Führe politische Verhandlungen: ${state.quest.negotiationTokensRemaining} Marken übrig.`);
     else if (!state.planning.finalPlan) lines.push("◉ Plane das finale Festival und sichere mindestens sieben Stimmen.");
     else if (state.phase === "council") lines.push("◉ Stelle den Festivalplan im Stadtrat zur Abstimmung.");

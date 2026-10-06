@@ -96,7 +96,7 @@ export class ShopInteriorScene extends Phaser.Scene {
     this.rudi = gameState.current.flags.rudiFirstMeetingComplete
       ? this.add.image(430, 470, "rudi").setOrigin(0.5, 0.8).setDepth(570)
       : undefined;
-    this.interactions = new InteractionSystem();
+    this.interactions = new InteractionSystem(this);
     this.createOwner(shop);
     this.createExit();
     this.registerRudi();
@@ -111,6 +111,7 @@ export class ShopInteriorScene extends Phaser.Scene {
 
   update(): void {
     this.updateRudi();
+    if (this.journal.isOpen || this.dialog.isOpen) this.interactions.clear();
     if (this.journal.isOpen) {
       this.player.updateMovement(false);
       this.hud.setPrompt("");
@@ -122,6 +123,8 @@ export class ShopInteriorScene extends Phaser.Scene {
     if (!this.dialog.isOpen && Phaser.Input.Keyboard.JustDown(this.menuKey)) {
       this.player.updateMovement(false);
       this.journal.open();
+      this.interactions.clear();
+      this.hud.setPrompt("");
       return;
     }
     if (this.dialog.isOpen) {
@@ -207,6 +210,7 @@ export class ShopInteriorScene extends Phaser.Scene {
   }
 
   private createInteriorColliders(): void {
+    this.addCollider(480, 43, 960, 86);
     this.addCollider(480, 251, 490, 92);
     this.addCollider(140, 222, 90, 205);
     this.addCollider(835, 222, 90, 205);

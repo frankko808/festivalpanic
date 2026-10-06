@@ -21,12 +21,19 @@ import { createWorldDepthLayer } from "../utils/createWorldDepthLayer";
 import { faceHorizontalMotion } from "../utils/motionFacing";
 import { setDepthIfChanged } from "../utils/setDepthIfChanged";
 import { PARK_GROUND_KEY } from "../utils/prepareParkGround";
+import { PARK_POND_WATER } from "../data/mapGeometry";
+import { polygonCollisionStrips } from "../utils/polygonCollisionStrips";
+import { findWalkableRoute } from "../utils/findWalkableRoute";
 
 const W = 1280;
 const H = 720;
 const HALL_W = 960;
 const HALL_H = 540;
-const MINKA_SPOTS = [
+export const KAI_PIERS = [
+  { x: 275, y: 62, width: 62, height: 188 },
+  { x: 975, y: 58, width: 70, height: 192 },
+] as const;
+export const MINKA_SPOTS = [
   { x: 1080, y: 365 },
   { x: 1065, y: 620 },
   { x: 360, y: 660 },
@@ -34,7 +41,7 @@ const MINKA_SPOTS = [
   { x: 1180, y: 640 },
   { x: 870, y: 650 },
   { x: 350, y: 345 },
-  { x: 980, y: 520 },
+  { x: 1010, y: 440 },
 ] as const;
 
 const GROUP_CARD: Readonly<Record<GroupId, ArgumentCardId>> = {
@@ -97,10 +104,18 @@ export class AdventureScene extends Phaser.Scene {
       : this.mapKind === "hall"
         ? { x: 480, y: 470 }
         : { x: 180, y: 390 };
-    const spawn = data.spawn ?? defaultSpawn;
+    const spawn = { ...(data.spawn ?? defaultSpawn) };
+    if (this.mapKind === "kai") {
+      for (const pier of KAI_PIERS) {
+        if (spawn.x >= pier.x && spawn.x <= pier.x + pier.width) {
+          // Recover old saves beyond the tip; the player's foot body starts ~12 px above y.
+          spawn.y = Math.max(spawn.y, pier.y + 12);
+        }
+      }
+    }
     this.player = new Player(this, spawn.x, spawn.y, "player");
     if (gameState.current.flags.rudiFirstMeetingComplete) this.companion = this.add.image(this.player.x - 45, this.player.y + 18, "rudi").setOrigin(0.5, 0.8).setDepth(500);
-    this.interactions = new InteractionSystem();
+    this.interactions = new InteractionSystem(this);
     this.createArea();
     this.physics.add.collider(this.player, this.staticObstacles);
     this.registerCompanionInteraction();
@@ -131,6 +146,7 @@ export class AdventureScene extends Phaser.Scene {
   update(): void {
     this.syncCollectibleVisibility();
     this.updateCompanion();
+    if (this.journal.isOpen || this.dialog.isOpen || this.unlock.isOpen) this.interactions.clear();
     if (this.journal.isOpen) {
       this.player.updateMovement(false);
       this.hud.setPrompt("");
@@ -146,6 +162,8 @@ export class AdventureScene extends Phaser.Scene {
     if (!this.dialog.isOpen && !this.unlock.isOpen && Phaser.Input.Keyboard.JustDown(this.menuKey)) {
       this.player.updateMovement(false);
       this.journal.open();
+      this.interactions.clear();
+      this.hud.setPrompt("");
       return;
     }
     if (this.unlock.isOpen) {
@@ -241,13 +259,14 @@ export class AdventureScene extends Phaser.Scene {
       if (gameState.depositTrash()) this.open(talk("trash-done", "Rudi", "Der Park ist wieder sauber. Erzählen wir Nora, dass alles im Mülleimer gelandet ist."));
       else this.open(talk("trash-bin", "Mülleimer", gameState.getFavorStatus("green-local") === "active" ? `Noch ${Math.max(0, 4 - gameState.current.favors.trashCollected.length)} Fundstücke fehlen.` : "Der Mülleimer ist leer."));
     }, prompt: () => "Müll einwerfen" });
-    ([[390, 235], [610, 560], [820, 405], [1010, 565]] as const).forEach(([x, y], i) => {
+    // Keep pickups on open ground, away from the pond, picnic, NPCs and moving dog/jogger.
+    ([[450, 185], [690, 450], [940, 345], [1220, 480]] as const).forEach(([x, y], i) => {
       const piece = this.add.image(x, y, i % 2 === 0 ? "plastic-cup" : "pizza-box").setDepth(100 + y).setAngle(i % 2 === 0 ? -8 : 6);
       this.collectibleVisuals.push({
         object: piece,
         visible: () => gameState.getFavorStatus("green-local") === "active" && !gameState.current.favors.trashCollected.includes(`trash-${i}`),
       });
-      this.interactions.register({ id: `trash-${i}`, displayName: "Müllstück", object: piece, range: 62, enabled: () => gameState.getFavorStatus("green-local") === "active" && !gameState.current.favors.trashCollected.includes(`trash-${i}`), interact: () => { if (gameState.collectTrash(`trash-${i}`)) { piece.setVisible(false); this.hud.setQuest(`Park-Aufgabe: ${gameState.current.favors.trashCollected.length}/4 Müllteile`); } } });
+      this.interactions.register({ id: `trash-${i}`, displayName: "Müllstück", object: piece, range: 62, enabled: () => gameState.getFavorStatus("green-local") === "active" && !gameState.current.favors.trashCollected.includes(`trash-${i}`), interact: () => { if (gameState.collectTrash(`trash-${i}`)) { piece.setVisible(false); this.hud.setQuest(`Park-Aufgabe: ${gameState.current.favors.trashCollected.length}/4 Müllteile`); } }, prompt: () => "Müll aufheben" });
     });
     this.createPoliticalGroup("green-local", 745, 280, "nora", "Nora", noraFirstMeeting);
     const moos = this.add.image(865, 475, "npc-gardener").setOrigin(0.5, 0.8).setDepth(575);
@@ -258,9 +277,9 @@ export class AdventureScene extends Phaser.Scene {
       else this.open(talk("moos-talk", "Frau Moos", "Die Blumen am Südeingang brauchen heute noch Wasser. Danach kann der Festabend kommen."));
     } });
     this.createJogger();
-    const parkCoin = this.add.image(1030, 590, "quest-coin").setDepth(700);
+    const parkCoin = this.add.image(1110, 430, "quest-coin").setDepth(530);
     this.collectibleVisuals.push({ object: parkCoin, visible: () => gameState.current.sideQuests.fountainCoins === "active" && !gameState.current.sideQuests.coinIds.includes("park") });
-    this.interactions.register({ id: "coin-park", displayName: "eine Glücksmünze", object: parkCoin, range: 58, enabled: () => gameState.current.sideQuests.fountainCoins === "active" && !gameState.current.sideQuests.coinIds.includes("park"), interact: () => { if (gameState.collectFountainCoin("park")) { parkCoin.setVisible(false); this.open(talk("coin-park-found", "Fundstück", "Eine Glücksmünze liegt im Gras, direkt neben dem Rosenbeet.")); } }, prompt: () => "Glücksmünze aufheben" });
+    this.interactions.register({ id: "coin-park", displayName: "eine Glücksmünze", object: parkCoin, range: 58, enabled: () => gameState.current.sideQuests.fountainCoins === "active" && !gameState.current.sideQuests.coinIds.includes("park"), interact: () => { if (gameState.collectFountainCoin("park")) { parkCoin.setVisible(false); this.open(talk("coin-park-found", "Fundstück", "Eine Glücksmünze liegt im Gras am Rand des Parkwegs.")); } }, prompt: () => "Glücksmünze aufheben" });
     this.addExit(1200, 360, "Zurück zum Marktplatz", () => this.scene.start("TownScene", { entrance: "west" }));
   }
 
@@ -285,11 +304,11 @@ export class AdventureScene extends Phaser.Scene {
     const owner = this.add.image(1060, 545, "npc-purple").setOrigin(0.5, 0.8).setDepth(645);
     addNpcCollision(this, this.player, owner);
     this.add.text(1060, 493, "Mara & Flocke", { fontFamily: "Courier New", fontSize: "13px", color: "#28304b", backgroundColor: "#fff5c9", padding: { x: 5, y: 2 } }).setOrigin(0.5).setDepth(900);
-    const dog = faceHorizontalMotion(this.add.image(970, 555, "park-dog").setDepth(660), 42);
+    const dog = faceHorizontalMotion(this.add.image(994, 555, "park-dog").setDepth(660), 37);
     addNpcCollision(this, this.player, dog, { width: 26, height: 12, bottomInset: 1 });
-    const ball = this.add.image(925, 548, "dog-ball").setDepth(655);
-    this.tweens.add({ targets: ball, x: 1005, y: 530, angle: 360, duration: 1150, yoyo: true, repeat: -1, hold: 420, repeatDelay: 520, ease: "Quad.Out" });
-    this.tweens.add({ targets: dog, x: 1012, y: 540, duration: 1150, yoyo: true, repeat: -1, hold: 420, repeatDelay: 520, ease: "Sine.InOut", onYoyo: () => faceHorizontalMotion(dog, -42), onRepeat: () => faceHorizontalMotion(dog, 42) });
+    const ball = this.add.image(982, 548, "dog-ball").setDepth(655);
+    this.tweens.add({ targets: ball, x: 1031, y: 530, angle: 360, duration: 1150, yoyo: true, repeat: -1, hold: 420, repeatDelay: 520, ease: "Quad.Out" });
+    this.tweens.add({ targets: dog, x: 1031, y: 540, duration: 1150, yoyo: true, repeat: -1, hold: 420, repeatDelay: 520, ease: "Sine.InOut", onYoyo: () => faceHorizontalMotion(dog, -37), onRepeat: () => faceHorizontalMotion(dog, 37) });
     this.tweens.add({ targets: owner, angle: 2, duration: 700, yoyo: true, repeat: -1, ease: "Sine.InOut" });
     this.interactions.register({ id: "mara-flocke", displayName: "Mara und Flocke", object: owner, range: 78, enabled: () => true, interact: () => this.open(talk("talk-mara-flocke", "Mara", "Flocke apportiert zuverlässig. Zurückbringen hält sie dagegen für einen unverbindlichen Vorschlag.")) });
   }
@@ -345,7 +364,20 @@ export class AdventureScene extends Phaser.Scene {
     const lina = this.add.image(900, 515, "npc-musician").setOrigin(0.5, 0.8).setDepth(615);
     addNpcCollision(this, this.player, lina);
     this.add.text(900, 465, "Lina Lied", { fontFamily: "Courier New", fontSize: "13px", color: "#28304b", backgroundColor: "#fff5c9", padding: { x: 5, y: 2 } }).setOrigin(0.5).setDepth(900);
-    this.interactions.register({ id: "lina-rhythm", displayName: "Lina Lied", object: lina, range: 74, enabled: () => true, interact: () => this.scene.start("RhythmScene", { returnScene: this.scene.key, spawn: { x: this.player.x, y: this.player.y } }), prompt: () => "Linas Drei-Akkorde-Spiel spielen" });
+    this.interactions.register({
+      id: "lina-rhythm", displayName: "Lina Lied", object: lina, range: 74,
+      enabled: () => true,
+      interact: () => {
+        if (gameState.linaRoundsRemaining === 0) {
+          this.open(talk("lina-rhythm-complete", "Lina Lied", "Drei Runden, das war unser kleines Konzert! Ich schone jetzt meine Stimme. Viel Spaß beim Festival!"));
+          return;
+        }
+        this.scene.start("RhythmScene", { returnScene: this.scene.key, spawn: { x: this.player.x, y: this.player.y } });
+      },
+      prompt: () => gameState.linaRoundsRemaining > 0
+        ? `Linas Drei-Akkorde-Spiel spielen (${gameState.linaRoundsRemaining}/3 Runden übrig)`
+        : "Mit Lina sprechen (3/3 Runden gespielt)",
+    });
     const catOrder = gameState.current.sideQuests.missingCatSpotOrder;
     const catSpotIndex = catOrder[Math.min(gameState.current.sideQuests.missingCatEncounters, 2)] ?? 0;
     const catSpot = MINKA_SPOTS[catSpotIndex] ?? MINKA_SPOTS[0];
@@ -404,9 +436,17 @@ export class AdventureScene extends Phaser.Scene {
     waypoints: ReadonlyArray<Readonly<{ x: number; y: number }>>,
     onComplete: () => void,
   ): void {
+    const obstacles = this.staticObstacles.map(zone => ({ x: zone.x, y: zone.y, width: zone.width, height: zone.height }));
+    const route: Readonly<{ x: number; y: number }>[] = [];
+    let start = { x: cat.x, y: cat.y };
+    for (const target of waypoints) {
+      const leg = findWalkableRoute(start, target, obstacles, W, H);
+      route.push(...leg);
+      if (leg.length) start = target;
+    }
     let waypointIndex = 0;
     const runNextLeg = (): void => {
-      const target = waypoints[waypointIndex];
+      const target = route[waypointIndex];
       if (!target) {
         cat.setAngle(0).setScale(1);
         onComplete();
@@ -421,7 +461,7 @@ export class AdventureScene extends Phaser.Scene {
         x: target.x,
         y: target.y,
         angle: deltaX >= 0 ? 3 : -3,
-        scaleX: Math.abs(cat.scaleX) * 1.08 * Math.sign(cat.scaleX || 1),
+        scaleX: 1.08 * Math.sign(cat.scaleX || 1),
         scaleY: 0.92,
         duration: Math.max(260, distance * 2.1),
         ease: "Sine.InOut",
@@ -438,11 +478,31 @@ export class AdventureScene extends Phaser.Scene {
     this.add.image(660, 410, "bench").setDepth(510).setFlipX(true);
     this.addMapCollider(285, 412, 54, 20);
     this.addMapCollider(660, 412, 54, 20);
-    this.addNpc(480, 224, "Timo am Empfang", "Willkommen im Rathaus. Für den Sitzungssaal brauchen Sie die Unterlagen zu allen vier Gruppen; ich zeige Ihnen gern den Weg.", "npc-clerk");
+    this.addNpc(480, 242, "Timo am Empfang", "Willkommen im Rathaus. Für den Ratssaal brauchen Sie die Unterlagen zu allen vier Gruppen. Die Treppe rechts führt hinauf; der Eingang ist ganz oben.", "npc-clerk", 110);
     this.createPoliticalGroup("budget-hawks", 230, 315, "centner", "Herr Centner", centnerFirstMeeting);
-    const guard = this.add.image(735, 315, "npc-guard").setOrigin(0.5, 0.8).setDepth(415);
+    const guard = this.add.image(735, 370, "npc-guard").setOrigin(0.5, 0.8).setDepth(470);
     addNpcCollision(this, this.player, guard);
-    this.interactions.register({ id: "guard", displayName: "den Wachmann", object: guard, range: 78, enabled: () => true, interact: () => { const n = gameState.current.quest.argumentCards.length; if (n >= 4) this.scene.start("CouncilChamberScene"); else this.open(talk("guard", "Wachmann", `Der erste Stock ist für die Arbeits- und Abstimmungsrunde reserviert. Dir fehlen noch ${4 - n} Argument${4 - n === 1 ? "" : "e"}.`)); }, prompt: () => gameState.current.quest.argumentCards.length >= 4 ? "In den ersten Stock gehen" : "Mit dem Wachmann sprechen" });
+    this.interactions.register({
+      id: "guard", displayName: "den Wachmann", object: guard, range: 62, enabled: () => true,
+      interact: () => {
+        const n = gameState.current.quest.argumentCards.length;
+        this.open(talk("guard", "Wachmann", n >= 4
+          ? "Alle vier Argumente sind da. Geh rechts die Treppe hinauf. Die Tür zum Ratssaal ist am oberen Ende."
+          : `Der erste Stock ist für die Arbeits- und Abstimmungsrunde reserviert. Dir fehlen noch ${4 - n} Argument${4 - n === 1 ? "" : "e"}. Sobald du alle hast, geh die Treppe bis zur Tür hinauf.`));
+      },
+      prompt: () => "Mit dem Wachmann sprechen",
+    });
+    const councilDoor = this.add.zone(825, 195, 88, 44);
+    this.interactions.register({
+      id: "hall-council-door", displayName: "die Tür zum Ratssaal", object: councilDoor,
+      range: 34, priority: 5, enabled: () => true,
+      interact: () => {
+        const n = gameState.current.quest.argumentCards.length;
+        if (n >= 4) this.scene.start("CouncilChamberScene");
+        else this.open(talk("council-door-locked", "Ratssaal", `Für den Zutritt fehlen noch ${4 - n} Argument${4 - n === 1 ? "" : "e"}. Sprich mit allen vier Gruppen, bevor du den Ratssaal betrittst.`));
+      },
+      prompt: () => gameState.current.quest.argumentCards.length >= 4 ? "Ratssaal betreten" : "Tür zum Ratssaal prüfen",
+    });
     this.addDoorExit(480, 507, "Rathaus verlassen", () => this.scene.start("TownScene", { entrance: "hall" }));
   }
 
@@ -573,11 +633,11 @@ export class AdventureScene extends Phaser.Scene {
     });
   }
 
-  protected addNpc(x: number, y: number, name: string, text: string, texture = "npc-clerk"): void {
+  protected addNpc(x: number, y: number, name: string, text: string, texture = "npc-clerk", range = 74): void {
     const body = this.add.image(x, y, texture).setOrigin(0.5, 0.8).setDepth(100 + y);
     addNpcCollision(this, this.player, body);
     this.add.text(x, y - 50, name, { fontFamily: "Courier New", fontSize: "13px", color: "#28304b", backgroundColor: "#fff5c9", padding: { x: 5, y: 2 } }).setOrigin(0.5).setDepth(900);
-    this.interactions.register({ id: `npc-${name}`, displayName: name, object: body, range: 74, enabled: () => true, interact: () => this.open(talk(`talk-${name}`, name, text)) });
+    this.interactions.register({ id: `npc-${name}`, displayName: name, object: body, range, enabled: () => true, interact: () => this.open(talk(`talk-${name}`, name, text)) });
   }
 
   protected addExit(x: number, y: number, label: string, action: () => void): void {
@@ -646,7 +706,7 @@ export class AdventureScene extends Phaser.Scene {
       g.fillStyle(0xd5c080, 1);
       g.fillPoints([[112, 350], [160, 292], [245, 258], [365, 248], [485, 278], [570, 320], [604, 380], [584, 445], [520, 495], [395, 515], [260, 505], [160, 470], [108, 425], [98, 385]].map(([x, y]) => new Phaser.Math.Vector2(x, y)), true, true);
       g.fillStyle(0x4f9caf, 1);
-      g.fillPoints([[125, 350], [175, 305], [255, 275], [365, 265], [475, 290], [550, 327], [585, 378], [566, 430], [505, 475], [390, 493], [270, 482], [175, 452], [125, 415], [114, 382]].map(([x, y]) => new Phaser.Math.Vector2(x, y)), true, true);
+      g.fillPoints(PARK_POND_WATER.map(([x, y]) => new Phaser.Math.Vector2(x, y)), true, true);
       g.fillStyle(0x83ced0, 1);
       g.fillPoints([[145, 352], [195, 318], [270, 292], [365, 284], [460, 302], [530, 335], [558, 378], [540, 415], [485, 453], [385, 470], [280, 460], [195, 438], [145, 405], [135, 380]].map(([x, y]) => new Phaser.Math.Vector2(x, y)), true, true);
       g.fillStyle(0xa9e3de, 0.75); g.fillEllipse(345, 337, 255, 34);
@@ -663,9 +723,7 @@ export class AdventureScene extends Phaser.Scene {
         const ripple = this.add.ellipse(225 + i * 82, 350 + (i % 2) * 48, 34, 9).setStrokeStyle(2, 0xe8ffff, 0.8).setAlpha(0.32).setDepth(3);
         this.tweens.add({ targets: ripple, scaleX: 2.2, scaleY: 1.7, alpha: 0, duration: 1500, delay: i * 430, repeat: -1 });
       });
-      this.addMapCollider(335, 365, 360, 155);
-      this.addMapCollider(210, 385, 150, 105);
-      this.addMapCollider(500, 375, 130, 105);
+      polygonCollisionStrips(PARK_POND_WATER).forEach(({ x, y, width, height }) => this.addMapCollider(x, y, width, height));
     }
     if (this.mapKind === "kai") {
       g.setDepth(1);
@@ -693,7 +751,7 @@ export class AdventureScene extends Phaser.Scene {
       g.fillStyle(0x8a684d, 1); g.fillRect(0, 232, W, 20);
       g.fillStyle(0xc69862, 1); g.fillRect(0, 232, W, 8);
       g.fillStyle(0x8a684d, 1);
-      g.fillRect(275, 62, 62, 188); g.fillRect(975, 58, 70, 192);
+      KAI_PIERS.forEach((pier) => g.fillRect(pier.x, pier.y, pier.width, pier.height));
       g.fillStyle(0xc69862, 1);
       g.fillRect(282, 62, 48, 178); g.fillRect(983, 58, 54, 182);
       g.lineStyle(2, 0x8a684d, 1);
@@ -721,6 +779,10 @@ export class AdventureScene extends Phaser.Scene {
       this.addMapCollider(137, 116, 274, 232);
       this.addMapCollider(656, 116, 638, 232);
       this.addMapCollider(1162, 116, 236, 232);
+      // Close the water above both pier tips, overlapping the side barriers by 1 px.
+      KAI_PIERS.forEach((pier) => this.addMapCollider(
+        pier.x + pier.width / 2, pier.y / 2, pier.width + 2, pier.y,
+      ));
     }
     if (this.mapKind === "hall") {
       g.setDepth(1);
@@ -738,6 +800,7 @@ export class AdventureScene extends Phaser.Scene {
       for (let y = 123; y < HALL_H; y += 48) g.lineBetween(3, y, HALL_W - 3, y);
       g.fillStyle(0x5a3c50, 1); g.fillRect(0, 0, HALL_W, 118);
       g.fillStyle(0x7d5570, 1); g.fillRect(0, 105, HALL_W, 13);
+      this.addMapCollider(HALL_W / 2, 59, HALL_W, 118);
       g.fillStyle(0x6b4960, 1);
       for (let x = 24; x < HALL_W; x += 128) {
         g.fillRoundedRect(x, 22, 86, 63, 4);
@@ -746,29 +809,52 @@ export class AdventureScene extends Phaser.Scene {
       }
       g.fillStyle(0xf6dd8a, 0.9);
       for (let x = 68; x < HALL_W; x += 128) g.fillCircle(x, 53, 8);
-      // Compact staircase instead of an oversized empty carpet corridor.
-      g.fillStyle(0x8f2f52, 1); g.fillRoundedRect(742, 182, 166, 213, 8);
-      g.fillStyle(0xc55470, 1); g.fillRoundedRect(775, 158, 100, 263, 10);
-      for (let y = 190; y < 390; y += 30) {
-        g.fillStyle(y % 60 === 10 ? 0xd76780 : 0xb84266, 1);
-        g.fillRect(785, y, 80, 22);
+      // Stone treads, dark risers and handrails make the upward route explicit.
+      g.fillStyle(0x49364c, 0.2); g.fillRoundedRect(752, 190, 153, 231, 5);
+      g.fillStyle(0x817983, 1); g.fillRect(762, 185, 126, 226);
+      g.fillStyle(0xddd8cf, 1); g.fillRect(771, 184, 108, 28);
+      for (let index = 0; index < 9; index += 1) {
+        const y = 212 + index * 22;
+        g.fillStyle(index % 2 === 0 ? 0xded9d0 : 0xd0cbc5, 1);
+        g.fillRect(771, y, 108, 15);
+        g.fillStyle(0x9a9297, 1); g.fillRect(771, y + 15, 108, 7);
+        g.fillStyle(0xfff1d1, 0.85); g.fillRect(771, y, 108, 2);
+        g.fillStyle(0x963e59, 1); g.fillRect(809, y + 2, 32, 13);
+        g.fillStyle(0x692e49, 1); g.fillRect(809, y + 15, 32, 7);
       }
-      g.fillStyle(0xf3e5bd, 1); g.fillRect(755, 128, 140, 76);
-      g.fillStyle(0x49364c, 1); g.fillRect(770, 141, 110, 50);
-      g.fillStyle(0xffe48c, 1); g.fillRect(780, 151, 90, 30);
-      this.add.text(825, 166, "1. STOCK\nSITZUNGSSAAL", { fontFamily: "Courier New", fontSize: "12px", fontStyle: "bold", align: "center", color: "#49364c" }).setOrigin(0.5).setDepth(3);
+      [762, 888].forEach((x) => {
+        g.fillStyle(0x5c4853, 1); g.fillRect(x - 4, 183, 8, 230);
+        for (let y = 191; y <= 411; y += 44) {
+          g.fillRect(x - 5, y, 10, 15);
+          g.fillStyle(0xe6ba72, 1); g.fillCircle(x, y, 5);
+          g.fillStyle(0x5c4853, 1);
+        }
+        g.fillStyle(0xc39457, 1); g.fillRect(x - 3, 180, 6, 226);
+        g.fillStyle(0xffd98e, 1); g.fillRect(x - 3, 180, 2, 226);
+        this.addMapCollider(x, 297, 10, 230);
+      });
+      // The door and its interaction are at the upper landing.
+      g.fillStyle(0x49364c, 1); g.fillRect(781, 133, 88, 51);
+      g.fillStyle(0x805444, 1); g.fillRect(789, 140, 72, 44);
+      g.fillStyle(0xb38358, 1); g.fillRect(795, 145, 60, 31);
+      g.fillStyle(0xf4c95d, 1); g.fillCircle(849, 163, 3);
+      this.add.text(825, 128, "1. STOCK · RATSSAAL", { fontFamily: "Courier New", fontSize: "11px", fontStyle: "bold", color: "#49364c", backgroundColor: "#fff1b8", padding: { x: 6, y: 4 } }).setOrigin(0.5).setDepth(3);
+      this.add.text(825, 430, "↑ TREPPE ZUM RATSSAAL", { fontFamily: "Courier New", fontSize: "11px", fontStyle: "bold", color: "#49364c" }).setOrigin(0.5).setDepth(3);
+      this.addMapCollider(825, 156, 88, 50);
 
       // Reception forms the visual and functional center of the smaller foyer.
-      g.fillStyle(0x805b46, 1); g.fillRoundedRect(365, 252, 230, 76, 7);
-      g.fillStyle(0xc88e59, 1); g.fillRect(378, 262, 204, 22);
-      g.fillStyle(0x49364c, 1); g.fillRect(410, 286, 140, 9);
-      g.fillStyle(0xf4e1b7, 1); g.fillRect(528, 237, 38, 20);
-      g.fillStyle(0x6d5570, 1); g.fillRect(533, 241, 28, 12);
-      this.add.text(480, 275, "INFORMATION", { fontFamily: "Courier New", fontSize: "13px", fontStyle: "bold", color: "#fff4c5" }).setOrigin(0.5).setDepth(3);
+      const reception = this.add.graphics().setDepth(428);
+      reception.fillStyle(0x805b46, 1); reception.fillRoundedRect(365, 252, 230, 76, 7);
+      reception.fillStyle(0xc88e59, 1); reception.fillRect(378, 262, 204, 22);
+      reception.fillStyle(0x49364c, 1); reception.fillRect(410, 286, 140, 9);
+      reception.fillStyle(0xf4e1b7, 1); reception.fillRect(528, 237, 38, 20);
+      reception.fillStyle(0x6d5570, 1); reception.fillRect(533, 241, 28, 12);
+      this.add.text(480, 275, "INFORMATION", { fontFamily: "Courier New", fontSize: "13px", fontStyle: "bold", color: "#fff4c5" }).setOrigin(0.5).setDepth(429);
       this.addMapCollider(480, 290, 230, 76);
 
       // Brochure rack, clock and coat hooks replace the decorative indoor trees.
       g.fillStyle(0x795543, 1); g.fillRoundedRect(82, 205, 74, 128, 5);
+      this.addMapCollider(119, 269, 74, 128);
       [0, 1, 2].forEach((index) => {
         g.fillStyle(index === 0 ? 0xf3cb69 : index === 1 ? 0x81b7ba : 0xd87991, 1);
         g.fillRect(94, 220 + index * 34, 50, 24);

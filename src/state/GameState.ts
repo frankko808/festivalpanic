@@ -64,6 +64,7 @@ export interface RunState {
     missingCatSpotOrder: number[];
     fountainCoins: "available" | "active" | "ready" | "complete";
     coinIds: string[];
+    linaRoundsPlayed: number;
   };
   companion: {
     rudiConversationCount: number;
@@ -162,6 +163,7 @@ class GameStateStore {
         missingCatSpotOrder: [],
         fountainCoins: "available",
         coinIds: [],
+        linaRoundsPlayed: 0,
       },
       companion: {
         rudiConversationCount: 0,
@@ -208,6 +210,11 @@ class GameStateStore {
   resumeSavedRun(): ResumePoint | undefined {
     if (!this.pendingResume) return undefined;
     this.run = structuredClone(this.pendingResume.run);
+    // Saves from before the participation limit have no Lina counter.
+    const linaRounds = this.run.sideQuests.linaRoundsPlayed;
+    this.run.sideQuests.linaRoundsPlayed = Number.isFinite(linaRounds)
+      ? Math.min(3, Math.max(0, Math.floor(linaRounds)))
+      : 0;
     this.run.festivalActivities.rudiSearchActive = false;
     this.resumePoint = structuredClone(this.pendingResume.point);
     if (this.run.phase === "festival" || this.run.council.outcome !== "pending") {
@@ -388,6 +395,18 @@ class GameStateStore {
     if (this.run.sideQuests.fountainCoins !== "ready") return false;
     this.run.sideQuests.fountainCoins = "complete";
     this.awardPoints(60);
+    return true;
+  }
+
+  get linaRoundsRemaining(): number {
+    return Math.max(0, 3 - this.run.sideQuests.linaRoundsPlayed);
+  }
+
+  startLinaRhythmRound(): boolean {
+    if (this.linaRoundsRemaining === 0) return false;
+    this.run.sideQuests.linaRoundsPlayed += 1;
+    // Count starts, including aborted rounds, and persist before entering the minigame.
+    this.flushRunSave();
     return true;
   }
 

@@ -4,6 +4,20 @@ import { gameState } from "../state/GameState";
 describe("side quests", () => {
   beforeEach(() => gameState.resetRun());
 
+  it("allows only three Lina round starts, including rounds aborted without points", () => {
+    expect(gameState.linaRoundsRemaining).toBe(3);
+    for (let round = 1; round <= 3; round += 1) {
+      expect(gameState.startLinaRhythmRound()).toBe(true);
+      expect(gameState.current.sideQuests.linaRoundsPlayed).toBe(round);
+      expect(gameState.linaRoundsRemaining).toBe(3 - round);
+    }
+    expect(gameState.startLinaRhythmRound()).toBe(false);
+    expect(gameState.current.sideQuests.linaRoundsPlayed).toBe(3);
+    expect(gameState.current.score).toBe(0);
+    gameState.resetRun();
+    expect(gameState.linaRoundsRemaining).toBe(3);
+  });
+
   it("completes the bakery delivery only after it was accepted", () => {
     expect(gameState.completeSideQuest("bakeryDelivery", 50)).toBe(false);
     expect(gameState.startSideQuest("bakeryDelivery")).toBe(true);

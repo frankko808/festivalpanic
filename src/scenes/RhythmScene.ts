@@ -26,10 +26,15 @@ export class RhythmScene extends Phaser.Scene {
     this.secondsRemaining = 30;
     this.returnScene = data.returnScene ?? "KaiScene";
     this.returnSpawn = data.spawn ?? { x: 930, y: 540 };
+    if (!gameState.startLinaRhythmRound()) {
+      this.returnToWorld();
+      return;
+    }
     this.cameras.main.setBackgroundColor("#17203a");
     this.drawStage();
     this.add.text(480, 76, "KAI-KONZERT: DREI AKKORDE", { fontFamily: "Courier New", fontSize: "30px", fontStyle: "bold", color: "#fff1a8" }).setOrigin(0.5);
     this.add.text(480, 128, "Drücke die angezeigte Taste: A · S · D", { fontFamily: "Courier New", fontSize: "18px", color: "#d9f6e9" }).setOrigin(0.5);
+    this.add.text(480, 157, `RUNDE ${gameState.current.sideQuests.linaRoundsPlayed}/3 · Auch ein Abbruch zählt als Runde.`, { fontFamily: "Courier New", fontSize: "14px", color: "#a9f4d0" }).setOrigin(0.5);
     this.noteText = this.add.text(480, 270, NOTES[0], { fontFamily: "Courier New", fontSize: "112px", fontStyle: "bold", color: "#ff725e", stroke: "#fff1a8", strokeThickness: 6 }).setOrigin(0.5);
     this.progressText = this.add.text(480, 390, "TAKT 1/12  •  TREFFER 0", { fontFamily: "Courier New", fontSize: "21px", color: "#fff8dc" }).setOrigin(0.5);
     this.clockText = this.add.text(860, 86, "ZEIT 30s", { fontFamily: "Courier New", fontSize: "17px", fontStyle: "bold", color: "#fff8dc", backgroundColor: "#5b405e", padding: { x: 8, y: 5 } }).setOrigin(1, 0.5);
@@ -50,7 +55,7 @@ export class RhythmScene extends Phaser.Scene {
   }
 
   private handleKey(key: string): void {
-    if (key === "ESCAPE") {
+    if (key === "ESCAPE" || (this.finished && key === "E")) {
       this.returnToWorld();
       return;
     }
@@ -80,10 +85,11 @@ export class RhythmScene extends Phaser.Scene {
     gameState.awardPoints(points);
     this.noteText.setText(this.hits >= 10 ? "ZUGABE!" : this.hits >= 7 ? "APPLAUS!" : "ÜBEN!").setFontSize(54).setColor("#67d5a2");
     this.progressText.setText(`${this.hits}/12 TREFFER  •  +${points} PUNKTE\n\n[E] zurück zum Kulturkai`).setAlign("center");
-    this.input.keyboard?.once("keydown-E", () => this.returnToWorld());
   }
 
   private returnToWorld(): void {
+    this.finished = true;
+    this.clockEvent?.remove(false);
     this.scene.start(this.returnScene, { spawn: { ...this.returnSpawn } });
   }
 

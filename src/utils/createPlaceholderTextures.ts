@@ -43,26 +43,50 @@ export function drawPlayer(
   graphics.fillStyle(0x2e2940, 0.2);
   graphics.fillEllipse(18, 44, 24, 7);
 
-  graphics.fillStyle(0x332d45, 1);
-  graphics.fillRect(8, 38, 8, 5);
-  graphics.fillRect(21, 38, 8, 5);
+  // Bare legs under shorts and skirt; trousers cover them below.
+  graphics.fillStyle(skin, 1);
+  graphics.fillRect(10, 34, 7, 7);
+  graphics.fillRect(20, 34, 7, 7);
   graphics.fillStyle(bottom, 1);
   if (appearance.bottom === 2) {
-    graphics.fillTriangle(8, 29, 29, 29, 32, 39);
-    graphics.fillRect(12, 38, 5, 3);
-    graphics.fillRect(22, 38, 5, 3);
+    // A balanced A-line silhouette with a continuous waist and level hem.
+    graphics.beginPath();
+    graphics.moveTo(11, 30);
+    graphics.lineTo(26, 30);
+    graphics.lineTo(30, 38);
+    graphics.lineTo(7, 38);
+    graphics.closePath();
+    graphics.fillPath();
+    graphics.fillStyle(0x332d45, 0.22);
+    graphics.fillRect(7, 37, 23, 2);
+    graphics.fillRect(13, 33, 2, 4);
+    graphics.fillRect(23, 33, 2, 4);
   } else {
-    graphics.fillRect(9, 30, 8, 10);
-    graphics.fillRect(20, 30, 8, 10);
-    if (appearance.bottom === 1) {
-      graphics.fillStyle(skin, 1);
-      graphics.fillRect(10, 35, 6, 5);
-      graphics.fillRect(21, 35, 6, 5);
+    // The waistband joins the two legs; the shirt ends above the crotch.
+    graphics.fillRect(9, 30, 19, 4);
+    const legHeight = appearance.bottom === 1 ? 2 : 6;
+    graphics.fillRect(10, 34, 7, legHeight);
+    graphics.fillRect(20, 34, 7, legHeight);
+    graphics.fillStyle(0x332d45, 0.22);
+    graphics.fillRect(9, 32, 19, 1);
+    graphics.fillRect(15, 34, 2, legHeight);
+    graphics.fillRect(20, 34, 2, legHeight);
+    if (appearance.bottom !== 1) {
+      graphics.fillStyle(0xffffff, 0.18);
+      graphics.fillRect(10, 38, 5, 2);
+      graphics.fillRect(22, 38, 5, 2);
     }
   }
 
+  graphics.fillStyle(0x332d45, 1);
+  graphics.fillRect(8, 40, 9, 4);
+  graphics.fillRect(20, 40, 9, 4);
+  graphics.fillStyle(0xffffff, 0.25);
+  graphics.fillRect(8, 43, 9, 1);
+  graphics.fillRect(20, 43, 9, 1);
+
   graphics.fillStyle(top, 1);
-  graphics.fillRoundedRect(7, 20, 22, 14, 3);
+  graphics.fillRoundedRect(7, 20, 22, 12, 3);
   graphics.fillRect(4, 22, 5, 10);
   graphics.fillRect(28, 22, 5, 10);
   if (appearance.bottom === 3) {

@@ -42,7 +42,7 @@ export class PreloadScene extends Phaser.Scene {
           const checkpoint = params.get("checkpoint");
           if (import.meta.env.DEV && checkpoint === "after-negotiations") {
             gameState.loadAfterNegotiationsCheckpoint();
-            this.scene.start("TownHallScene", { spawn: { x: 735, y: 380 } });
+            this.scene.start("TownHallScene", { spawn: { x: 825, y: 440 } });
             return;
           }
           if (import.meta.env.DEV && checkpoint) {
