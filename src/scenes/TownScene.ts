@@ -12,6 +12,7 @@ import type { GroupId } from "../data/festivalRules";
 import type { DialogueScript } from "../dialogue/types";
 import { gameState } from "../state/GameState";
 import { InteractionSystem } from "../systems/InteractionSystem";
+import { updateRudiFollower } from "../systems/RudiFollower";
 import { addNpcCollision } from "../systems/addNpcCollision";
 import { CouncilSeatsOverlay } from "../ui/CouncilSeatsOverlay";
 import { DialogBox } from "../ui/DialogBox";
@@ -703,38 +704,8 @@ export class TownScene extends Phaser.Scene {
       return;
     }
 
-    const facing = this.player.facingDirection;
-    const desiredX = Phaser.Math.Clamp(
-      this.player.x - facing.x * 50 + facing.y * 22,
-      28,
-      WORLD_WIDTH - 28,
-    );
-    const desiredY = Phaser.Math.Clamp(
-      this.player.y - facing.y * 50 - facing.x * 14,
-      35,
-      WORLD_HEIGHT - 28,
-    );
-    const resolvedTarget = this.resolveCompanionTarget(desiredX, desiredY);
-    const targetX = resolvedTarget.x;
-    const targetY = resolvedTarget.y;
-    const distance = Phaser.Math.Distance.Between(this.rudi.x, this.rudi.y, targetX, targetY);
-
-    if (distance > 260) {
-      this.rudi.setFlipX(targetX > this.rudi.x).setPosition(targetX, targetY);
-    } else if (distance > 8) {
-      const step = Math.min(distance, 132 * (delta / 1000));
-      const angle = Phaser.Math.Angle.Between(this.rudi.x, this.rudi.y, targetX, targetY);
-      this.rudi.x += Math.cos(angle) * step;
-      this.rudi.y += Math.sin(angle) * step;
-      if (Math.abs(targetX - this.rudi.x) > 2) {
-        this.rudi.setFlipX(targetX > this.rudi.x);
-      }
-      this.rudi.setScale(1, 1 + Math.sin(this.time.now / 85) * 0.055);
-    } else {
-      this.rudi.setScale(1);
-    }
-
-    setDepthIfChanged(this.rudi, 100 + Math.round(this.rudi.y));
+    updateRudiFollower(this.rudi, this.player, delta, this.time.now, this.physics.world.bounds,
+      (target) => this.resolveCompanionTarget(target.x, target.y));
     this.rudiLabel.setPosition(this.rudi.x, this.rudi.y - 42);
   }
 

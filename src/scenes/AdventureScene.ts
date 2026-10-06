@@ -3,6 +3,7 @@ import { Player } from "../characters/Player";
 import { DialogBox } from "../ui/DialogBox";
 import { TownHud } from "../ui/TownHud";
 import { InteractionSystem } from "../systems/InteractionSystem";
+import { updateRudiFollower } from "../systems/RudiFollower";
 import { addNpcCollision } from "../systems/addNpcCollision";
 import { gameState } from "../state/GameState";
 import type { DialogueScript } from "../dialogue/types";
@@ -143,9 +144,9 @@ export class AdventureScene extends Phaser.Scene {
     this.cameras.main.fadeIn(180, 59, 49, 82);
   }
 
-  update(): void {
+  update(_time: number, delta: number): void {
     this.syncCollectibleVisibility();
-    this.updateCompanion();
+    this.updateCompanion(delta);
     if (this.journal.isOpen || this.dialog.isOpen || this.unlock.isOpen) this.interactions.clear();
     if (this.journal.isOpen) {
       this.player.updateMovement(false);
@@ -191,14 +192,9 @@ export class AdventureScene extends Phaser.Scene {
     if (this.consumeAction()) this.interactions.interact();
   }
 
-  protected updateCompanion(): void {
+  protected updateCompanion(delta: number): void {
     if (!this.companion || !this.player) return;
-    const targetX = this.player.x - this.player.facingDirection.x * 48 + this.player.facingDirection.y * 20;
-    const targetY = this.player.y - this.player.facingDirection.y * 48 - this.player.facingDirection.x * 12;
-    this.companion.x = Phaser.Math.Linear(this.companion.x, targetX, 0.08);
-    this.companion.y = Phaser.Math.Linear(this.companion.y, targetY, 0.08);
-    this.companion.setFlipX(targetX > this.companion.x);
-    setDepthIfChanged(this.companion, 100 + Math.round(this.companion.y));
+    updateRudiFollower(this.companion, this.player, delta, this.time.now, this.physics.world.bounds);
   }
 
   private registerCompanionInteraction(): void {

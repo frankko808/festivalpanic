@@ -5,13 +5,13 @@ import { createRudiCompanionDialogue } from "../data/dialogues/rudiCompanion";
 import type { DialogueScript } from "../dialogue/types";
 import { gameState } from "../state/GameState";
 import { InteractionSystem } from "../systems/InteractionSystem";
+import { updateRudiFollower } from "../systems/RudiFollower";
 import { DialogBox } from "../ui/DialogBox";
 import { GroupSummaryOverlay } from "../ui/GroupSummaryOverlay";
 import { JournalMenu } from "../ui/JournalMenu";
 import { TownHud } from "../ui/TownHud";
 import { UnlockOverlay } from "../ui/UnlockOverlay";
 import { createWorldDepthLayer } from "../utils/createWorldDepthLayer";
-import { setDepthIfChanged } from "../utils/setDepthIfChanged";
 
 const talk = (id: string, speaker: string, text: string): DialogueScript => ({
   id,
@@ -65,8 +65,8 @@ export class CouncilChamberScene extends Phaser.Scene {
     this.cameras.main.fadeIn(180, 59, 49, 82);
   }
 
-  update(): void {
-    this.updateRudi();
+  update(_time: number, delta: number): void {
+    this.updateRudi(delta);
     if (this.journal.isOpen || this.dialog.isOpen || this.unlock.isOpen) this.interactions.clear();
     if (this.journal.isOpen) {
       this.player.updateMovement(false);
@@ -243,14 +243,9 @@ export class CouncilChamberScene extends Phaser.Scene {
     return "Abstimmung beginnen";
   }
 
-  private updateRudi(): void {
+  private updateRudi(delta: number): void {
     if (!this.rudi) return;
-    const targetX = this.player.x - this.player.facingDirection.x * 48 + this.player.facingDirection.y * 20;
-    const targetY = this.player.y - this.player.facingDirection.y * 48 - this.player.facingDirection.x * 12;
-    this.rudi.x = Phaser.Math.Linear(this.rudi.x, targetX, 0.08);
-    this.rudi.y = Phaser.Math.Linear(this.rudi.y, targetY, 0.08);
-    this.rudi.setFlipX(targetX > this.rudi.x);
-    setDepthIfChanged(this.rudi, 100 + Math.round(this.rudi.y));
+    updateRudiFollower(this.rudi, this.player, delta, this.time.now, this.physics.world.bounds);
   }
 
   private configureKeys(): void {

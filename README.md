@@ -17,6 +17,7 @@ Der aktuelle Vertical Slice enthält:
 - Kamera, Weltgrenzen und Kollisionen
 - Rudi als sichtbaren NPC mit Nähe-Interaktion und anschließender Begleiterfunktion
 - Y-basierte Tiefensortierung und Hindernis-Ausweichziel für Rudi
+- einheitliche Begleitersteuerung auf allen Karten: Rudi hinkt zunächst hinterher und beschleunigt bei größerem Abstand, auch über das Turbotempo hinaus
 - datengetriebene Dialogbox mit Maus- und Tastatursteuerung
 - die vollständige erste Begegnung mit Rudi samt drei Antwortpfaden
 - das anschließende Auftreten und vollständige Erstgespräch der Bürgermeisterin

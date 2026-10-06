@@ -21,11 +21,11 @@ import {
 } from "../data/festivalPresentation";
 import { addNpcCollision } from "../systems/addNpcCollision";
 import { InteractionSystem } from "../systems/InteractionSystem";
+import { updateRudiFollower } from "../systems/RudiFollower";
 import { gameState } from "../state/GameState";
 import { DialogBox } from "../ui/DialogBox";
 import { TownHud } from "../ui/TownHud";
 import { createWorldDepthLayer } from "../utils/createWorldDepthLayer";
-import { setDepthIfChanged } from "../utils/setDepthIfChanged";
 import { ACHIEVEMENTS } from "../data/achievements";
 import { createFestivalOutroMoments } from "../data/festivalOutroMoments";
 import { formatDuration } from "../utils/formatDuration";
@@ -158,8 +158,8 @@ export class FestivalScene extends Phaser.Scene {
     if (!data.resume) this.dialog.open(festivalOpeningDialogue, () => this.hud.setPrompt(""));
   }
 
-  update(): void {
-    this.updateRudi();
+  update(_time: number, delta: number): void {
+    this.updateRudi(delta);
     if (this.dialog.isOpen || this.outro || this.resultsVisible || this.endConfirmation.isOpen || this.journal.isOpen) this.interactions.clear();
     if (this.endConfirmation.isOpen) {
       this.player.updateMovement(false);
@@ -604,15 +604,9 @@ export class FestivalScene extends Phaser.Scene {
     }).setOrigin(0.5).setDepth(900);
   }
 
-  private updateRudi(): void {
+  private updateRudi(delta: number): void {
     if (!this.rudi?.active || !this.rudi.visible || !this.player?.active || this.resultsVisible) return;
-    const targetX = this.player.x - this.player.facingDirection.x * 50 + this.player.facingDirection.y * 22;
-    const targetY = this.player.y - this.player.facingDirection.y * 50 - this.player.facingDirection.x * 12;
-    const previousX = this.rudi.x;
-    this.rudi.x = Phaser.Math.Linear(this.rudi.x, targetX, 0.085);
-    this.rudi.y = Phaser.Math.Linear(this.rudi.y, targetY, 0.085);
-    if (Math.abs(this.rudi.x - previousX) > 0.15) this.rudi.setFlipX(this.rudi.x > previousX);
-    setDepthIfChanged(this.rudi, 100 + Math.round(this.rudi.y));
+    updateRudiFollower(this.rudi, this.player, delta, this.time.now, this.physics.world.bounds);
     this.rudiLabel.setPosition(this.rudi.x, this.rudi.y - 47);
   }
 
