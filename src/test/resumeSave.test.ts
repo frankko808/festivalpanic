@@ -45,6 +45,34 @@ describe("Fortsetzen-Spielstand", () => {
     expect(loadRunSave()).toBeUndefined();
   });
 
+  it("behält Haythans zweite Antwort nach Kartenwechsel und Neuladen", async () => {
+    gameState.setPhase("town-intro");
+    gameState.captureResumePoint({ scene: "KaiScene", x: 306, y: 200 });
+    expect(gameState.recordHaythanConversation()).toBe(false);
+    expect(loadRunSave()?.run.flags.haythanSpokenTo).toBe(true);
+    gameState.captureResumePoint({ scene: "TownScene", x: 1450, y: 370 });
+    gameState.flushRunSave();
+
+    vi.resetModules();
+    const { gameState: restored } = await import("../state/GameState");
+    expect(restored.resumeSavedRun()).toMatchObject({ scene: "TownScene" });
+    expect(restored.recordHaythanConversation()).toBe(true);
+  });
+
+  it("lädt ältere Spielstände ohne Haythan mit seiner ersten Antwort", async () => {
+    gameState.setPhase("town-intro");
+    gameState.captureResumePoint({ scene: "KaiScene", x: 306, y: 200 });
+    gameState.flushRunSave();
+    const saved = JSON.parse(values.get("festival-panic-run-v1")!);
+    delete saved.run.flags.haythanSpokenTo;
+    values.set("festival-panic-run-v1", JSON.stringify(saved));
+
+    vi.resetModules();
+    const { gameState: restored } = await import("../state/GameState");
+    restored.resumeSavedRun();
+    expect(restored.recordHaythanConversation()).toBe(false);
+  });
+
   it("speichert weder Test-Checkpoints noch beschädigte Daten", () => {
     gameState.loadFestivalCheckpoint();
     gameState.captureResumePoint({ scene: "FestivalScene", x: 800, y: 790 });

@@ -21,7 +21,7 @@ describe("Dialogporträts", () => {
   it("deckt Stadt-, Park-, Rathaus- und Geschäfts-NPCs ab", () => {
     const speakers = [
       "Oma Ortrud", "Postbote Pepe", "Samira", "Frau Moos", "Mara", "Jogger Juri",
-      "Kalle Kabel", "Lina Lied", "Wachmann", "Bäckerin Bea", "Flora Feld", "Derya Demir",
+      "Kalle Kabel", "Lina Lied", "Haythan", "Wachmann", "Bäckerin Bea", "Flora Feld", "Derya Demir",
     ];
     speakers.forEach((speaker) => expect(resolveDialoguePortrait(speaker).texture).not.toBe("npc-clerk"));
     expect(resolveDialoguePortrait("Timo am Empfang").texture).toBe("npc-clerk");

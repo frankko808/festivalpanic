@@ -23,6 +23,7 @@ const PORTRAITS: Readonly<Record<string, DialoguePortrait>> = {
   "Jogger Juri": { texture: "npc-jogger", background: 0xf2b49f },
   "Kalle Kabel": { texture: "npc-technician", background: 0xafccdc },
   "Lina Lied": { texture: "npc-musician", background: 0xd5b8ed },
+  Haythan: { texture: "haythan", background: 0xaedee4 },
   "Timo am Empfang": { texture: "npc-clerk", background: 0xbcd8df },
   Wachmann: { texture: "npc-guard", background: 0xafbdd4 },
   "Bäckerin Bea": { texture: "npc-red", background: 0xf2c3a4 },

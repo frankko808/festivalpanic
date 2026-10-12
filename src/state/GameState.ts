@@ -39,6 +39,7 @@ export interface RunState {
     firstDraftSaved: boolean;
     turboUnlocked: boolean;
     festivalMayorConversationComplete: boolean;
+    haythanSpokenTo: boolean;
   };
   quest: {
     mainQuestStarted: boolean;
@@ -123,6 +124,7 @@ class GameStateStore {
         firstDraftSaved: false,
         turboUnlocked: false,
         festivalMayorConversationComplete: false,
+        haythanSpokenTo: false,
       },
       quest: {
         mainQuestStarted: false,
@@ -210,6 +212,7 @@ class GameStateStore {
   resumeSavedRun(): ResumePoint | undefined {
     if (!this.pendingResume) return undefined;
     this.run = structuredClone(this.pendingResume.run);
+    this.run.flags.haythanSpokenTo = this.run.flags.haythanSpokenTo === true;
     // Saves from before the participation limit have no Lina counter.
     const linaRounds = this.run.sideQuests.linaRoundsPlayed;
     this.run.sideQuests.linaRoundsPlayed = Number.isFinite(linaRounds)
@@ -299,6 +302,13 @@ class GameStateStore {
     const conversationIndex = this.run.companion.rudiConversationCount;
     this.run.companion.rudiConversationCount += 1;
     return conversationIndex;
+  }
+
+  recordHaythanConversation(): boolean {
+    const alreadySpoken = this.run.flags.haythanSpokenTo;
+    this.run.flags.haythanSpokenTo = true;
+    this.flushRunSave();
+    return alreadySpoken;
   }
 
   completeMayorMeeting(): void {
@@ -564,6 +574,7 @@ class GameStateStore {
       firstDraftSaved: true,
       turboUnlocked: true,
       festivalMayorConversationComplete: false,
+      haythanSpokenTo: false,
     };
     this.run.quest.mainQuestStarted = true;
     this.run.quest.groupsInterviewed = 4;

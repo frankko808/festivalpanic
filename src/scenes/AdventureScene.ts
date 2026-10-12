@@ -13,6 +13,7 @@ import { miaFirstMeeting } from "../data/dialogues/miaFirstMeeting";
 import { noraFirstMeeting } from "../data/dialogues/noraFirstMeeting";
 import { centnerFirstMeeting } from "../data/dialogues/centnerFirstMeeting";
 import { groupFollowUps } from "../data/dialogues/groupFollowUps";
+import { createHaythanDialogue } from "../data/dialogues/haythan";
 import { createRudiCompanionDialogue, type RudiLocation } from "../data/dialogues/rudiCompanion";
 import { centnerReceiptBriefing, centnerReceiptComplete, centnerReceiptProgress, noraCleanupBriefing, noraCleanupProgress } from "../data/dialogues/groupQuestDialogues";
 import { createNegotiationDialogue, negotiationsCompleteDialogue, resolveNegotiation } from "../data/negotiations";
@@ -341,6 +342,7 @@ export class AdventureScene extends Phaser.Scene {
 
   protected createKai(): void {
     this.addLabel(640, 295, "KULTURKAI · ALTE WERFTHALLE", "#314b70");
+    this.createHaythan();
     this.add.image(285, 515, "crate").setDepth(615);
     this.add.image(315, 520, "barrel").setDepth(620);
     this.add.image(345, 515, "crate").setDepth(615).setAngle(4);
@@ -425,6 +427,28 @@ export class AdventureScene extends Phaser.Scene {
     this.interactions.register({ id: "coin-kai", displayName: "eine Glücksmünze", object: kaiCoin, range: 58, enabled: () => gameState.current.sideQuests.fountainCoins === "active" && !gameState.current.sideQuests.coinIds.includes("kai"), interact: () => { if (gameState.collectFountainCoin("kai")) { kaiCoin.setVisible(false); this.open(talk("coin-kai-found", "Fundstück", "Eine Glücksmünze liegt zwischen den Planken am Kai.")); } }, prompt: () => "Glücksmünze aufheben" });
     this.addLabel(780, 555, "TECHNIKLAGER", "#5d3d68");
     this.addExit(70, 430, "Zum Marktplatz", () => this.scene.start("TownScene", { entrance: "east" }));
+  }
+
+  private createHaythan(): void {
+    const pier = KAI_PIERS[0];
+    const x = pier.x + pier.width - 15;
+    const y = pier.y + 84;
+    const haythan = this.add.image(x, y, "haythan").setOrigin(0.5, 0.8).setDepth(100 + y);
+    addNpcCollision(this, this.player, haythan);
+    this.add.text(x, y - 50, "Haythan", {
+      fontFamily: "Courier New", fontSize: "13px", color: "#28304b",
+      backgroundColor: "#fff5c9", padding: { x: 5, y: 2 },
+    }).setOrigin(0.5).setDepth(900);
+
+    this.add.image(x + 16, y - 38, "fishing-rod").setOrigin(0, 0).setDepth(101 + y);
+    const bobber = this.add.image(x + 58, y + 11, "fishing-bobber").setDepth(102 + y);
+    this.tweens.add({ targets: bobber, y: bobber.y + 2, duration: 1100, yoyo: true, repeat: -1, ease: "Sine.InOut" });
+
+    this.interactions.register({
+      id: "npc-Haythan", displayName: "Haythan", object: haythan, range: 74,
+      enabled: () => true,
+      interact: () => this.open(createHaythanDialogue(gameState.recordHaythanConversation())),
+    });
   }
 
   private runMinkaRoute(

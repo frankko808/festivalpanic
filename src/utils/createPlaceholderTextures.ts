@@ -583,6 +583,39 @@ export function createPlaceholderTextures(scene: Phaser.Scene): void {
     graphics.fillStyle(0xf4d15d, 1);
     graphics.fillRect(24, 25, 3, 3);
   });
+  createTexture(scene, "haythan", 36, 48, (graphics) => {
+    drawPlayer(graphics, { skin: 2, hair: 0, hairColor: 0, top: 1, bottom: 1, accessory: 0 });
+    graphics.fillStyle(0xe5f4df, 1);
+    graphics.fillRect(14, 21, 1, 6);
+    graphics.fillRect(23, 21, 1, 6);
+    graphics.fillStyle(0x39b7a4, 1);
+    graphics.fillRect(28, 23, 6, 5);
+    graphics.fillStyle(0xd99a61, 1);
+    graphics.fillRect(30, 27, 6, 4);
+  });
+  createTexture(scene, "fishing-rod", 48, 54, (graphics) => {
+    graphics.lineStyle(3, 0x49364c, 1);
+    graphics.lineBetween(1, 29, 40, 2);
+    graphics.lineStyle(1, 0xe4bb7c, 1);
+    graphics.lineBetween(1, 28, 40, 1);
+    graphics.lineStyle(1, 0xfff4c5, 0.9);
+    graphics.lineBetween(40, 2, 42, 10);
+    graphics.lineBetween(42, 10, 42, 49);
+    graphics.fillStyle(0x49364c, 1);
+    graphics.fillCircle(3, 30, 3);
+    graphics.fillStyle(0xc9cfdb, 1);
+    graphics.fillRect(2, 29, 2, 2);
+  });
+  createTexture(scene, "fishing-bobber", 14, 12, (graphics) => {
+    graphics.lineStyle(1, 0xcdf4ef, 0.7);
+    graphics.strokeEllipse(7, 9, 12, 4);
+    graphics.fillStyle(0x49364c, 1);
+    graphics.fillRect(4, 2, 6, 7);
+    graphics.fillStyle(0xee6a5b, 1);
+    graphics.fillRect(5, 1, 4, 4);
+    graphics.fillStyle(0xfff4c5, 1);
+    graphics.fillRect(5, 5, 4, 3);
+  });
   createTexture(scene, "npc-gardener", 36, 46, (graphics) =>
     drawTownNpc(graphics, 0xe2ad82, 0x9b866f, 0x5d8d6c, 0xf2c85b, "hat"),
   );
