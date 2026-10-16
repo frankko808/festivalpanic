@@ -57,6 +57,17 @@ Der aktuelle Vertical Slice enthält:
 
 Der Hauptpfad ist jetzt bis zum beschlossenen oder per Rettungsring geretteten Sommerfest einschließlich freiem Festivalabschnitt und Auswertung spielbar.
 
+## Punktewertung
+
+- Ratsbeschluss: 1.500 Punkte beim ersten Versuch, 750 beim zweiten. Jede Stimme über sieben bringt zusätzlich 200 Punkte (bis zu 2.500 beziehungsweise 1.750 insgesamt).
+- Abschlussbonus für Spielzeit: linear bis zu 1.200 Punkte; bei 15 Minuten 600 Punkte, ab 30 Minuten null.
+- Abschlussbonus für Budget: ein Punkt je volle 10 Euro unter 20.000 Euro, maximal 500 Punkte. Genau 20.000 Euro oder mehr bringt keinen Budgetbonus.
+- Lina (30 Sekunden) und Pommes (60 Sekunden): zufällige Aufgabenfolgen. Richtige Eingaben bringen mit zunehmender Reaktionszeit weniger Punkte. Maximal 60 beziehungsweise 320 Punkte pro Runde.
+- Dosenwerfen (45 Sekunden): kontinuierliche Wertung nach Genauigkeit und Reaktionszeit je Wurf, schnellerer Zeiger und 700 Millisekunden Pause zwischen Würfen; maximal 500 Punkte.
+- Rudi finden (45 Sekunden): bis zu 500 Punkte, abhängig von der Suchdauer. Falsche Auswahl verkürzt die verbleibende Frist um zwei Sekunden.
+- Bei Ablauf der Gesamtfrist zählt die gesamte Minispielrunde null Punkte, einschließlich bereits gesammelter Teilpunkte. Ein früherer Bestwert bleibt erhalten. Lina hat weiterhin drei Teilnahmen; Pommes und Dosenwerfen belohnen weiterhin nur Verbesserungen des Bestwerts.
+- Zeit- und Budgetboni werden beim Abschluss einmalig vergeben und in der Auswertung getrennt angezeigt. Bereits gespeicherte Highscores bleiben bestehen und stammen gegebenenfalls aus der bisherigen Wertung.
+
 ## Lokaler Start
 
 Voraussetzungen: Node.js, npm und Git.

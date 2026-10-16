@@ -1,6 +1,8 @@
+import { councilPoints, completionBonuses } from "../data/scoring";
 import { clearRunSave, loadRunSave, loadSave, writeRunSave, writeSave, type CharacterAppearance, type PersistedSave, type ResumePoint, type RunSave } from "./storage";
 import type { ArgumentCardId } from "../data/argumentCards";
 import {
+  calculatePlanCost,
   DEFAULT_FESTIVAL_PLAN,
   DEFAULT_NEGOTIATION_FLAGS,
   type FestivalPlan,
@@ -28,6 +30,7 @@ export interface RunState {
   phase: GamePhase;
   score: number;
   elapsedMs: number;
+  completionBonus?: { time: number; budget: number };
   achievements: AchievementId[];
   appearance: CharacterAppearance;
   flags: {
@@ -83,6 +86,7 @@ export interface RunState {
   festivalActivities: {
     friesRushScore: number;
     canTossScore: number;
+    rudiScore?: number;
     rudiFound: boolean;
     rudiSearchActive: boolean;
   };
@@ -242,6 +246,10 @@ class GameStateStore {
   }
 
   setPhase(phase: GamePhase): void {
+    if (phase === "results" && !this.run.completionBonus && this.run.planning.finalPlan) {
+      this.run.completionBonus = completionBonuses(this.run.elapsedMs, calculatePlanCost(this.run.planning.finalPlan, this.run.quest.negotiationFlags));
+      this.awardPoints(this.run.completionBonus.time + this.run.completionBonus.budget);
+    }
     this.run.phase = phase;
     if (phase === "results") {
       this.pendingResume = undefined;
@@ -495,11 +503,11 @@ class GameStateStore {
   }
 
   recordCouncilVote(votes: number): "passed" | "amendment" | "rescued" {
+    if (this.run.council.outcome !== "pending") return this.run.council.outcome === "rescued" ? "rescued" : "passed";
     this.run.council.attempts += 1;
     if (votes >= 7) {
       this.run.council.outcome = "passed";
-      this.awardPoints(this.run.council.attempts === 1 ? 1_500 : 750);
-      if (votes === 12 && this.run.council.attempts === 1) this.awardPoints(500);
+      this.awardPoints(councilPoints(votes, this.run.council.attempts === 1));
       this.run.phase = "festival";
       this.evaluateFinalPlanAchievements();
       return "passed";
@@ -641,9 +649,10 @@ class GameStateStore {
       if (this.run.festivalActivities.rudiFound) return 0;
       this.run.festivalActivities.rudiFound = true;
       this.run.festivalActivities.rudiSearchActive = false;
-      this.awardPoints(500);
+      this.run.festivalActivities.rudiScore = safePoints;
+      this.awardPoints(safePoints);
       this.unlockAchievement("find-rudi");
-      return 500;
+      return safePoints;
     }
     const key = kind === "fries" ? "friesRushScore" : "canTossScore";
     const previous = this.run.festivalActivities[key];

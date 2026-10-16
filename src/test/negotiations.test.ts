@@ -155,7 +155,7 @@ describe("Abstimmungsausgänge", () => {
     gameState.resetRun();
     const before = gameState.current.score;
     expect(gameState.recordCouncilVote(8)).toBe("passed");
-    expect(gameState.current.score - before).toBe(1_500);
+    expect(gameState.current.score - before).toBe(1_700);
     expect(gameState.current.phase).toBe("festival");
   });
 

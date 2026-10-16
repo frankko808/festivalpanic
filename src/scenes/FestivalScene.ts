@@ -638,7 +638,7 @@ export class FestivalScene extends Phaser.Scene {
     const score = gameState.current.score;
     const activityScore = gameState.current.festivalActivities.friesRushScore
       + gameState.current.festivalActivities.canTossScore
-      + (gameState.current.festivalActivities.rudiFound ? 500 : 0);
+      + (gameState.current.festivalActivities.rudiFound ? (gameState.current.festivalActivities.rudiScore ?? 500) : 0);
     const fixed = <T extends Phaser.GameObjects.GameObject & Phaser.GameObjects.Components.ScrollFactor & Phaser.GameObjects.Components.Depth>(object: T, depth: number): T => object.setScrollFactor(0).setDepth(depth);
 
     fixed(this.add.rectangle(VIEW_WIDTH / 2, VIEW_HEIGHT / 2, VIEW_WIDTH, VIEW_HEIGHT, 0x11152d, 0.9), 2000);
@@ -656,7 +656,8 @@ export class FestivalScene extends Phaser.Scene {
       `Festivalspiele: ${activityScore} Punkte`,
       `Highscore: ${gameState.persisted.highScore}`,
       `Spielzeit: ${formatDuration(gameState.current.elapsedMs)}`,
-    ].join("\n"), { fontFamily: "Trebuchet MS", fontSize: "18px", lineSpacing: 10, color: "#fff8dc" }).setOrigin(0.5), 2003);
+      `Boni: Zeit +${gameState.current.completionBonus?.time ?? 0} · Budget +${gameState.current.completionBonus?.budget ?? 0}`,
+    ].join("\n"), { fontFamily: "Trebuchet MS", fontSize: "17px", lineSpacing: 7, color: "#fff8dc" }).setOrigin(0.5), 2003);
     const badges = gameState.current.achievements.map((id) => ACHIEVEMENTS[id].title);
     if (badges.length) fixed(this.add.text(480, 382, `ERFOLGE: ${badges.join(" · ")}`, {
       fontFamily: "Trebuchet MS", fontSize: "14px", fontStyle: "bold", color: "#a9f4d0",

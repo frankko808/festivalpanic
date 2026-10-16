@@ -1,12 +1,19 @@
 import Phaser from "phaser";
+import { speedPoints, roundPoints, canThrowPoints } from "../data/scoring";
 import { gameState } from "../state/GameState";
 
 export type FestivalGameKind = "fries" | "cans" | "find-rudi";
 
-const FRIES_ORDERS = [2, 0, 3, 1, 1, 2, 3, 0] as const;
+const FRIES_COUNT = 8;
 const FRIES_LABELS = ["KLEIN + KETCHUP", "KLEIN + MAYO", "GROSS + KETCHUP", "GROSS + MAYO"] as const;
 
 export class FestivalGameScene extends Phaser.Scene {
+  private friesOrders: number[] = [];
+  private taskStartedAt = 0;
+  private deadline = 0;
+  private roundStartedAt = 0;
+  private canReadyAt = 0;
+  private canPhase = 0;
   private kind: FestivalGameKind = "fries";
   private returnScene = "FestivalScene";
   private returnSpawn = { x: 800, y: 790 };
@@ -39,6 +46,16 @@ export class FestivalGameScene extends Phaser.Scene {
     this.returnScene = data.returnScene ?? "FestivalScene";
     this.returnSpawn = data.spawn ?? { x: 800, y: 790 };
     this.finished = false;
+    this.orderText = undefined;
+    this.friesStatus = undefined;
+    this.canCursor = undefined;
+    this.canStatus = undefined;
+    this.canFeedback = undefined;
+    this.friesOrders = Array.from({ length: FRIES_COUNT }, () => Phaser.Math.Between(0, 3));
+    this.taskStartedAt = this.time.now;
+    this.roundStartedAt = this.time.now;
+    this.canReadyAt = this.time.now;
+    this.canPhase = Phaser.Math.FloatBetween(0, Math.PI * 2);
     this.friesIndex = 0;
     this.friesScore = 0;
     this.friesButtons.length = 0;
@@ -54,7 +71,7 @@ export class FestivalGameScene extends Phaser.Scene {
 
     const keyboard = this.input.keyboard;
     if (keyboard) {
-      const handleKeyDown = (event: KeyboardEvent): void => this.handleKey(event.key);
+      const handleKeyDown = (event: KeyboardEvent): void => { if (!event.repeat) this.handleKey(event.key); };
       keyboard.on("keydown", handleKeyDown);
       this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => keyboard.off("keydown", handleKeyDown));
     }
@@ -63,7 +80,19 @@ export class FestivalGameScene extends Phaser.Scene {
 
   update(): void {
     if (this.kind !== "cans" || this.finished || !this.canCursor) return;
-    this.canCursor.x = 220 + (Math.sin(this.time.now / 430) * 0.5 + 0.5) * 520;
+    this.canCursor.x = this.canPosition();
+  }
+
+  private canPosition(): number {
+    return 220 + (Math.sin((this.time.now - this.canReadyAt) / 260 + this.canPhase) * 0.5 + 0.5) * 520;
+  }
+
+  private expire(): boolean {
+    if (this.time.now < this.deadline) return false;
+    this.orderText?.setVisible(false);
+    this.friesButtons.forEach((button) => button.setVisible(false));
+    this.finish("Die Zeit ist um. Diese Runde zählt nicht.\n\n0 PUNKTE");
+    return true;
   }
 
   private handleKey(rawKey: string): void {
@@ -90,6 +119,7 @@ export class FestivalGameScene extends Phaser.Scene {
   }
 
   private startClock(seconds: number): void {
+    this.deadline = this.time.now + seconds * 1000;
     this.secondsRemaining = seconds;
     this.clockText = this.add.text(886, 77, "", {
       fontFamily: "Courier New", fontSize: "17px", fontStyle: "bold",
@@ -100,14 +130,9 @@ export class FestivalGameScene extends Phaser.Scene {
       delay: 1000, repeat: seconds - 1,
       callback: () => {
         if (this.finished) return;
-        this.secondsRemaining -= 1;
+        this.secondsRemaining = Math.max(0, Math.ceil((this.deadline - this.time.now) / 1000));
         this.updateClock();
-        if (this.kind === "fries") this.updateFriesText();
-        if (this.secondsRemaining === 0) {
-          if (this.kind === "fries") this.finishFries();
-          else if (this.kind === "cans") this.finishCans();
-          else this.finish("Die Zeit ist um. Rudi hat das Verstecken etwas zu ernst genommen.\n\nVersuch es am Suchstand erneut.");
-        }
+        this.expire();
       },
     });
   }
@@ -137,7 +162,7 @@ export class FestivalGameScene extends Phaser.Scene {
 
   private createFriesRush(): void {
     this.add.text(480, 78, "POMMES-RUSH", { fontFamily: "Courier New", fontSize: "34px", fontStyle: "bold", color: "#fff1a8" }).setOrigin(0.5);
-    this.add.text(480, 116, "Samira: Menschen wollen gleichzeitig Pommes!", { fontFamily: "Trebuchet MS", fontSize: "17px", fontStyle: "bold", color: "#ffb0aa" }).setOrigin(0.5);
+    this.add.text(480, 116, "Schnell + richtig = mehr Punkte. Zeit abgelaufen = 0.", { fontFamily: "Trebuchet MS", fontSize: "17px", fontStyle: "bold", color: "#ffb0aa" }).setOrigin(0.5);
     this.orderText = this.add.text(480, 183, "", { fontFamily: "Courier New", fontSize: "25px", fontStyle: "bold", color: "#ffffff", backgroundColor: "#d85f73", padding: { x: 18, y: 10 } }).setOrigin(0.5);
     FRIES_LABELS.forEach((label, index) => {
       const x = index % 2 === 0 ? 290 : 670;
@@ -154,21 +179,23 @@ export class FestivalGameScene extends Phaser.Scene {
 
   private serveFries(selection: number): void {
     if (this.finished || this.kind !== "fries") return;
-    const expected = FRIES_ORDERS[this.friesIndex];
+    if (this.expire()) return;
+    const expected = this.friesOrders[this.friesIndex];
     if (selection === expected) {
-      this.friesScore += 40;
+      this.friesScore += speedPoints(40, this.time.now - this.taskStartedAt, 2_500);
       this.cameras.main.flash(80, 103, 213, 162, false);
     } else {
       this.friesScore -= 10;
       this.cameras.main.shake(90, 0.008);
     }
     this.friesIndex += 1;
-    if (this.friesIndex >= FRIES_ORDERS.length) this.finishFries();
+    this.taskStartedAt = this.time.now;
+    if (this.friesIndex >= this.friesOrders.length) this.finishFries();
     else this.updateFriesText();
   }
 
   private updateFriesText(): void {
-    const order = FRIES_LABELS[FRIES_ORDERS[this.friesIndex] ?? 0] ?? FRIES_LABELS[0];
+    const order = FRIES_LABELS[this.friesOrders[this.friesIndex] ?? 0] ?? FRIES_LABELS[0];
     this.orderText?.setText(`BESTELLUNG: ${order}`);
     this.friesStatus?.setText(`BESTELLUNG ${Math.min(this.friesIndex + 1, 8)}/8  •  ${this.friesScore} PUNKTE`);
   }
@@ -178,14 +205,14 @@ export class FestivalGameScene extends Phaser.Scene {
     this.orderText?.setVisible(false);
     this.friesStatus?.setVisible(false);
     this.friesButtons.forEach((button) => button.setVisible(false));
-    const score = Math.max(0, this.friesScore);
+    const score = roundPoints(this.friesScore, this.friesIndex === FRIES_COUNT, this.time.now, this.deadline);
     const gained = gameState.recordFestivalActivity("fries", score);
     this.finish(`Samira: Danke, das hat den Andrang aufgefangen.\nRudi: Jetzt haben wir selbst eine Pause verdient.\n\n${score} PUNKTE  •  +${gained} ZUM SPIELSTAND`);
   }
 
   private createCanToss(): void {
     this.add.text(480, 78, "DOSENWERFEN", { fontFamily: "Courier New", fontSize: "34px", fontStyle: "bold", color: "#fff1a8" }).setOrigin(0.5);
-    this.add.text(480, 116, "Fünf Würfe. SPACE oder ENTER im goldenen Bereich.", { fontFamily: "Trebuchet MS", fontSize: "17px", fontStyle: "bold", color: "#d9f6e9" }).setOrigin(0.5);
+    this.add.text(480, 116, "5 Würfe: SPACE/ENTER. Schnell + mittig = mehr. Zeit um = 0.", { fontFamily: "Trebuchet MS", fontSize: "17px", fontStyle: "bold", color: "#d9f6e9" }).setOrigin(0.5);
     const g = this.add.graphics();
     const canPositions = [[450, 220], [480, 220], [510, 220], [465, 188], [495, 188], [480, 156]] as const;
     canPositions.forEach(([x, y], index) => {
@@ -195,7 +222,7 @@ export class FestivalGameScene extends Phaser.Scene {
     g.fillStyle(0x17182c, 1); g.fillRoundedRect(200, 278, 560, 44, 8);
     g.fillStyle(0xd85f73, 1); g.fillRect(210, 288, 150, 24);
     g.fillStyle(0xffd878, 1); g.fillRect(360, 288, 240, 24);
-    g.fillStyle(0x67d5a2, 1); g.fillRect(430, 285, 100, 30);
+    g.fillStyle(0x67d5a2, 1); g.fillRect(468, 285, 24, 30);
     g.fillStyle(0xd85f73, 1); g.fillRect(600, 288, 150, 24);
     this.canCursor = this.add.rectangle(220, 300, 8, 55, 0xffffff).setStrokeStyle(2, 0x49364c);
     this.canFeedback = this.add.text(480, 255, "", {
@@ -206,12 +233,17 @@ export class FestivalGameScene extends Phaser.Scene {
 
   private throwBall(): void {
     if (this.finished || this.kind !== "cans" || !this.canCursor) return;
+    if (this.expire() || this.time.now < this.canReadyAt) return;
+    this.canCursor.x = this.canPosition();
     const accuracy = 1 - Math.min(1, Math.abs(this.canCursor.x - 480) / 260);
-    const knocked = accuracy >= 0.82 ? 3 : accuracy >= 0.55 ? 2 : accuracy >= 0.25 ? 1 : 0;
-    const points = knocked >= 3 ? 100 : knocked === 2 ? 50 : knocked === 1 ? 20 : 0;
+    const knocked = accuracy >= 0.95 ? 3 : accuracy >= 0.55 ? 2 : accuracy >= 0.25 ? 1 : 0;
+    const points = canThrowPoints(this.canCursor.x, this.time.now - this.taskStartedAt);
     this.canScore += points;
     this.canThrows += 1;
-    this.canFeedback?.setText(knocked === 0 ? "DANEBEN" : `${knocked} ${knocked === 1 ? "DOSE" : "DOSEN"}`).setColor(knocked === 0 ? "#ff8b91" : "#a9f4d0").setScale(1.18);
+    this.canReadyAt = this.time.now + 700;
+    this.taskStartedAt = this.canReadyAt;
+    this.canPhase = Phaser.Math.FloatBetween(0, Math.PI * 2);
+    this.canFeedback?.setText(knocked === 0 ? "DANEBEN" : `${knocked} ${knocked === 1 ? "DOSE" : "DOSEN"} · +${points}`).setColor(knocked === 0 ? "#ff8b91" : "#a9f4d0").setScale(1.18);
     if (this.canFeedback) this.tweens.add({ targets: this.canFeedback, scale: 1, duration: 120, ease: "Back.Out" });
     if (knocked > 0) this.cameras.main.shake(70, 0.005 + knocked * 0.002);
     if (this.canThrows >= 5) {
@@ -223,6 +255,7 @@ export class FestivalGameScene extends Phaser.Scene {
 
   private finishCans(): void {
     if (this.finished) return;
+    this.canScore = roundPoints(this.canScore, this.canThrows === 5, this.time.now, this.deadline);
     const gained = gameState.recordFestivalActivity("cans", this.canScore);
     const rudi = this.canScore === 0 ? "Der nächste Versuch wird besser." : this.canScore >= 500 ? "Alle Dosen erwischt!" : "Guter Wurf. Noch eine Runde?";
     this.finish(`Rudi: ${rudi}\n\n${this.canScore} PUNKTE  •  +${gained} ZUM SPIELSTAND`);
@@ -231,7 +264,7 @@ export class FestivalGameScene extends Phaser.Scene {
   private createFindRudi(): void {
     this.add.text(480, 76, "FINDE RUDI", { fontFamily: "Courier New", fontSize: "34px", fontStyle: "bold", color: "#fff1a8" }).setOrigin(0.5);
     this.add.text(480, 116, "Rudi versteckt sich unter 15 Festivalgästen. Finde den Waschbären!", { fontFamily: "Trebuchet MS", fontSize: "17px", fontStyle: "bold", color: "#d9f6e9" }).setOrigin(0.5);
-    this.add.text(480, 145, "FIGUR ANKLICKEN  ODER  PFEILE/WASD + ENTER/E", { fontFamily: "Courier New", fontSize: "15px", color: "#ffe39c" }).setOrigin(0.5);
+    this.add.text(480, 145, "KLICK / PFEILE + E · Schnell finden = mehr Punkte · Zeit um = 0", { fontFamily: "Courier New", fontSize: "15px", color: "#ffe39c" }).setOrigin(0.5);
     const hidingTextures = ["npc-red", "npc-green", "npc-purple", "npc-jogger", "npc-gardener", "npc-clerk"] as const;
     this.rudiIndex = Phaser.Math.Between(0, 14);
     for (let index = 0; index < 15; index += 1) {
@@ -257,14 +290,17 @@ export class FestivalGameScene extends Phaser.Scene {
 
   private chooseRudiCard(index: number): void {
     if (this.finished) return;
+    if (this.expire()) return;
     this.selectRudiCard(index);
     if (index === this.rudiIndex) {
-      const gained = gameState.recordFestivalActivity("find-rudi", 500);
+      const gained = gameState.recordFestivalActivity("find-rudi", speedPoints(500, this.time.now - this.roundStartedAt, 15_000));
       this.finish(`Gefunden: Gast ${index + 1}!\nRudi: Da bist du ja. Ich hatte die Musik im Blick.\n+${gained} PUNKTE`);
     } else {
       this.rudiCards[index]?.setFillStyle(0x8a4d63, 0.95);
       this.resultText.setText("Hier steckt nur ein Festivalgast. Such weiter!").setColor("#ffb0aa");
-      this.secondsRemaining = Math.max(1, this.secondsRemaining - 2);
+      this.deadline -= 2_000;
+      if (this.expire()) return;
+      this.secondsRemaining = Math.max(0, Math.ceil((this.deadline - this.time.now) / 1000));
       this.updateClock();
     }
   }
@@ -278,6 +314,8 @@ export class FestivalGameScene extends Phaser.Scene {
   }
 
   private returnToFestival(): void {
+    this.finished = true;
+    this.clockEvent?.remove(false);
     this.scene.start(this.returnScene, { spawn: { ...this.returnSpawn }, resume: true });
   }
 }

@@ -113,6 +113,7 @@ export class JournalMenu {
     if (state.sideQuests.fountainCoins !== "available") lines.push(`• Glücksmünzen\n  Gefunden: ${state.sideQuests.coinIds.length}/3`);
     if (state.quest.negotiationStarted) lines.push(`• Gesprächsmarken\n  Noch verfügbar: ${state.quest.negotiationTokensRemaining}/${state.quest.negotiationTokensTotal}`);
     lines.push(`• Spielzeit dieses Durchlaufs: ${formatDuration(state.elapsedMs)}`);
+    lines.push("• Punkteboni\n  Jede Stimme über 7: +200 Punkte.\n  Unter 30 Minuten: bis zu +1.200 Punkte.\n  Unter 20.000 €: +1 pro 10 € Reserve, höchstens +500.\n  Zeit- und Budgetbonus gibt es beim Abschluss.");
     return lines.join("\n\n");
   }
 
